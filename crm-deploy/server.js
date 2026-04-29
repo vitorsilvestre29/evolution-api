@@ -641,9 +641,16 @@ app.post('/api/leads/:id/messages/send', requireAuth, async (req, res) => {
   if (!db.leads[id]) return res.status(404).json({ message: 'Lead nao encontrado' });
 
   try {
+    const rawJid = String(jid || '');
+    const number = jidToNumber(jid);
+    const isDirectChat = /^\d+$/.test(rawJid) || rawJid.includes('@s.whatsapp.net') || rawJid.includes('@c.us');
+    if (!number || !isDirectChat) {
+      return res.status(400).json({ message: 'Esta conversa nao possui numero valido para resposta direta pelo WhatsApp.' });
+    }
+
     const response = await evolution(`/message/sendText/${encodeURIComponent(instance)}`, {
       method: 'POST',
-      body: JSON.stringify({ number: jidToNumber(jid), text }),
+      body: JSON.stringify({ number, text }),
     }, instance);
 
     appendMessage(db, instance, jid, {

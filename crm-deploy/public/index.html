@@ -84,27 +84,32 @@
   .pill-waiting { background: #3b2f00; color: #fbbf24; }
   .time-text { color: #6b7280; font-size: 12px; }
   .msg-preview { color: #9ca3af; font-size: 12px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .modal { background: #1a1d2e; border-radius: 8px; border: 1px solid #2a2d3e; width: min(1120px, 96vw); max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; }
-  .modal-header { padding: 20px 24px; border-bottom: 1px solid #2a2d3e; display: flex; align-items: center; justify-content: space-between; }
-  .modal-header h2 { font-size: 16px; font-weight: 700; }
-  .modal-close { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 20px; line-height: 1; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(5,7,12,.82); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal { background: #1a1d2e; border-radius: 8px; border: 1px solid #2a2d3e; width: min(1220px, 96vw); height: min(860px, 92vh); overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 24px 80px rgba(0,0,0,.45); }
+  .modal-header { height: 58px; padding: 0 24px; border-bottom: 1px solid #2a2d3e; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .modal-header h2 { font-size: 16px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modal-close { width: 34px; height: 34px; border-radius: 8px; background: transparent; border: 1px solid transparent; color: #6b7280; cursor: pointer; font-size: 20px; line-height: 1; }
   .modal-close:hover { color: #fff; }
-  .modal-body { padding: 0; display: grid; grid-template-columns: 320px 1fr; min-height: 560px; overflow: hidden; }
-  .lead-panel { padding: 24px; border-right: 1px solid #2a2d3e; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; }
-  .chat-panel { background: #10131f; display: flex; flex-direction: column; min-width: 0; }
-  .chat-toolbar { padding: 14px 18px; border-bottom: 1px solid #2a2d3e; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .modal-body { flex: 1; padding: 0; display: grid; grid-template-columns: 340px minmax(0, 1fr); min-height: 0; overflow: hidden; }
+  .lead-panel { padding: 22px 24px; border-right: 1px solid #2a2d3e; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; min-height: 0; }
+  .lead-actions { margin-top: auto; display: flex; gap: 10px; padding-top: 12px; border-top: 1px solid #2a2d3e; }
+  .lead-actions .btn { flex: 1; }
+  .chat-panel { background: #10131f; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; min-height: 0; }
+  .chat-toolbar { min-height: 64px; padding: 12px 18px; border-bottom: 1px solid #2a2d3e; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #111522; }
   .chat-title { font-size: 12px; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
-  .composer { border-top: 1px solid #2a2d3e; padding: 12px; display: flex; gap: 10px; background: #10131f; }
-  .composer textarea { flex: 1; min-height: 44px; max-height: 120px; resize: vertical; background: #141624; border: 1px solid #2a2d3e; border-radius: 8px; color: #fff; padding: 10px 12px; outline: none; font-family: inherit; }
+  .composer { border-top: 1px solid #2a2d3e; padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; background: #111522; flex-shrink: 0; }
+  .composer textarea { width: 100%; min-height: 46px; max-height: 120px; resize: vertical; background: #141624; border: 1px solid #2a2d3e; border-radius: 8px; color: #fff; padding: 11px 12px; outline: none; font-family: inherit; line-height: 1.35; }
+  .composer textarea:focus { border-color: #4f46e5; }
+  .composer-status { grid-column: 1 / -1; min-height: 16px; color: #6b7280; font-size: 11px; }
+  .composer-status.error { color: #f87171; }
+  .composer-status.ok { color: #34d399; }
   .field label { font-size: 11px; color: #6b7280; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 6px; }
   .field input, .field textarea, .field select { width: 100%; background: #141624; border: 1px solid #2a2d3e; border-radius: 8px; padding: 10px 12px; color: #fff; font-size: 13px; outline: none; font-family: inherit; resize: vertical; }
   .field input:focus, .field textarea:focus, .field select:focus { border-color: #4f46e5; }
-  .modal-footer { padding: 16px 24px; border-top: 1px solid #2a2d3e; display: flex; gap: 10px; justify-content: flex-end; }
-  .msgs-list { flex: 1; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 18px; }
-  .msg-bubble { padding: 9px 12px; border-radius: 10px; font-size: 13px; max-width: min(78%, 620px); line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .msg-bubble.in { background: #22263a; align-self: flex-start; }
-  .msg-bubble.out { background: #1e3a5f; align-self: flex-end; }
+  .msgs-list { min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 18px; background: radial-gradient(circle at 50% 0, rgba(79,70,229,.08), transparent 280px), #10131f; }
+  .msg-bubble { padding: 9px 12px; border-radius: 10px; font-size: 13px; max-width: min(76%, 640px); line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: 0 8px 20px rgba(0,0,0,.14); }
+  .msg-bubble.in { background: #24283b; align-self: flex-start; border-top-left-radius: 3px; }
+  .msg-bubble.out { background: #214a7a; align-self: flex-end; border-top-right-radius: 3px; }
   .msg-bubble .ts { font-size: 10px; color: #9ca3af; margin-top: 3px; }
   .empty { text-align: center; padding: 60px 20px; color: #6b7280; }
   .empty .icon { font-size: 38px; margin-bottom: 12px; }
@@ -116,9 +121,11 @@
     .sidebar { width: 100%; border-right: 0; border-bottom: 1px solid #2a2d3e; }
     .stats-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
     .table-wrap { overflow-x: auto; }
+    .modal { height: 96vh; }
     .modal-body { grid-template-columns: 1fr; overflow-y: auto; }
-    .lead-panel { border-right: 0; border-bottom: 1px solid #2a2d3e; }
-    .chat-panel { min-height: 460px; }
+    .lead-panel { border-right: 0; border-bottom: 1px solid #2a2d3e; max-height: 48vh; }
+    .chat-panel { min-height: 520px; }
+    .composer { grid-template-columns: 1fr; }
     .admin-form { grid-template-columns: 1fr; }
   }
 </style>
@@ -250,6 +257,10 @@
         <div class="field"><label>Proximo retorno</label><input type="datetime-local" id="modal-followup" onchange="saveLeadData()" /></div>
         <div class="field"><label>Valor do negocio (R$)</label><input type="number" id="modal-valor" placeholder="Ex: 1500.00" oninput="saveLeadData()" /></div>
         <div class="field"><label>Anotacoes</label><textarea id="modal-notes" rows="8" placeholder="Anotacoes sobre esse lead..." oninput="saveLeadData()"></textarea></div>
+        <div class="lead-actions">
+          <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
+          <button class="btn btn-primary" onclick="openWhatsApp()">WhatsApp</button>
+        </div>
       </div>
       <div class="chat-panel">
         <div class="chat-toolbar">
@@ -261,14 +272,11 @@
         </div>
         <div class="msgs-list" id="modal-msgs"></div>
         <form class="composer" onsubmit="sendMessage(event)">
-          <textarea id="composer-text" placeholder="Responder pelo WhatsApp..."></textarea>
+          <textarea id="composer-text" placeholder="Responder pelo WhatsApp..." onkeydown="handleComposerKeydown(event)"></textarea>
           <button class="btn btn-primary" type="submit">Enviar</button>
+          <div class="composer-status" id="composer-status"></div>
         </form>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
-      <button class="btn btn-primary" onclick="openWhatsApp()">Abrir no WhatsApp</button>
     </div>
   </div>
 </div>
@@ -616,6 +624,8 @@ async function openLead(encodedId) {
   document.getElementById('modal-valor').value = currentLead.valor||'';
   document.getElementById('modal-notes').value = currentLead.notes||'';
   document.getElementById('composer-text').value = '';
+  document.getElementById('composer-status').textContent = '';
+  document.getElementById('composer-status').className = 'composer-status';
   document.getElementById('modal').style.display = 'flex';
   await refreshConversation();
 }
@@ -670,26 +680,46 @@ async function sendMessage(event) {
   event.preventDefault();
   if (!currentLead) return;
   const textarea = document.getElementById('composer-text');
+  const statusEl = document.getElementById('composer-status');
   const text = textarea.value.trim();
   if (!text) return;
   const button = event.target.querySelector('button');
   button.disabled = true;
   button.textContent = 'Enviando...';
+  statusEl.textContent = '';
+  statusEl.className = 'composer-status';
   try {
     const result = await apiPost(`/api/leads/${encodeURIComponent(currentLead.id)}/messages/send`, { text });
     textarea.value = '';
+    statusEl.textContent = 'Mensagem enviada pelo WhatsApp.';
+    statusEl.className = 'composer-status ok';
     document.getElementById('modal-msgs').innerHTML = (result.messages || []).map(m => {
       const ts = m.ts?new Date(m.ts*1000).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
       return `<div class="msg-bubble ${m.fromMe?'out':'in'}">${escapeHtml(m.text)}<div class="ts">${ts}</div></div>`;
     }).join('');
     const box = document.getElementById('modal-msgs');
     box.scrollTop = box.scrollHeight;
-    await loadLeads();
+    currentLead.lastMsg = text;
+    currentLead.lastFromMe = true;
+    currentLead.lastTs = Math.floor(Date.now() / 1000);
+    const storedLead = allLeads.find(lead => lead.id === currentLead.id);
+    if (storedLead) Object.assign(storedLead, currentLead);
+    updateStats();
+    updateCounts();
+    renderTable();
   } catch (error) {
-    alert(error.message || 'Nao foi possivel enviar a mensagem.');
+    statusEl.textContent = error.message || 'Nao foi possivel enviar a mensagem.';
+    statusEl.className = 'composer-status error';
   } finally {
     button.disabled = false;
     button.textContent = 'Enviar';
+  }
+}
+
+function handleComposerKeydown(event) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    event.currentTarget.form.requestSubmit();
   }
 }
 
