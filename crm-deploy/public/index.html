@@ -59,18 +59,22 @@
   .time-text { color: #6b7280; font-size: 12px; }
   .msg-preview { color: #9ca3af; font-size: 12px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .modal { background: #1a1d2e; border-radius: 8px; border: 1px solid #2a2d3e; width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; }
+  .modal { background: #1a1d2e; border-radius: 8px; border: 1px solid #2a2d3e; width: min(1120px, 96vw); max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; }
   .modal-header { padding: 20px 24px; border-bottom: 1px solid #2a2d3e; display: flex; align-items: center; justify-content: space-between; }
   .modal-header h2 { font-size: 16px; font-weight: 700; }
   .modal-close { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 20px; line-height: 1; }
   .modal-close:hover { color: #fff; }
-  .modal-body { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+  .modal-body { padding: 0; display: grid; grid-template-columns: 320px 1fr; min-height: 560px; overflow: hidden; }
+  .lead-panel { padding: 24px; border-right: 1px solid #2a2d3e; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; }
+  .chat-panel { background: #10131f; display: flex; flex-direction: column; min-width: 0; }
+  .chat-toolbar { padding: 14px 18px; border-bottom: 1px solid #2a2d3e; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .chat-title { font-size: 12px; color: #9ca3af; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
   .field label { font-size: 11px; color: #6b7280; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 6px; }
   .field input, .field textarea, .field select { width: 100%; background: #141624; border: 1px solid #2a2d3e; border-radius: 8px; padding: 10px 12px; color: #fff; font-size: 13px; outline: none; font-family: inherit; resize: vertical; }
   .field input:focus, .field textarea:focus, .field select:focus { border-color: #4f46e5; }
   .modal-footer { padding: 16px 24px; border-top: 1px solid #2a2d3e; display: flex; gap: 10px; justify-content: flex-end; }
-  .msgs-list { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
-  .msg-bubble { padding: 8px 12px; border-radius: 10px; font-size: 12px; max-width: 85%; }
+  .msgs-list { flex: 1; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; padding: 18px; }
+  .msg-bubble { padding: 9px 12px; border-radius: 10px; font-size: 13px; max-width: min(78%, 620px); line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; }
   .msg-bubble.in { background: #22263a; align-self: flex-start; }
   .msg-bubble.out { background: #1e3a5f; align-self: flex-end; }
   .msg-bubble .ts { font-size: 10px; color: #9ca3af; margin-top: 3px; }
@@ -84,6 +88,9 @@
     .sidebar { width: 100%; border-right: 0; border-bottom: 1px solid #2a2d3e; }
     .stats-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
     .table-wrap { overflow-x: auto; }
+    .modal-body { grid-template-columns: 1fr; overflow-y: auto; }
+    .lead-panel { border-right: 0; border-bottom: 1px solid #2a2d3e; }
+    .chat-panel { min-height: 460px; }
   }
 </style>
 </head>
@@ -138,22 +145,33 @@
   <div class="modal">
     <div class="modal-header"><h2 id="modal-title">Lead</h2><button class="modal-close" onclick="closeModal()">x</button></div>
     <div class="modal-body">
-      <div style="display:flex;gap:12px;align-items:center;">
-        <div class="avatar" id="modal-avatar" style="width:52px;height:52px;font-size:20px;"></div>
-        <div>
-          <div style="font-weight:700;font-size:16px;" id="modal-name"></div>
-          <div style="font-size:12px;color:#6b7280;" id="modal-phone"></div>
-          <div style="font-size:12px;color:#6b7280;" id="modal-inst"></div>
+      <div class="lead-panel">
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div class="avatar" id="modal-avatar" style="width:52px;height:52px;font-size:20px;"></div>
+          <div>
+            <div style="font-weight:700;font-size:16px;" id="modal-name"></div>
+            <div style="font-size:12px;color:#6b7280;" id="modal-phone"></div>
+            <div style="font-size:12px;color:#6b7280;" id="modal-inst"></div>
+          </div>
         </div>
+        <div class="field"><label>Status do negocio</label>
+          <select id="modal-status" onchange="saveLeadData()">
+            <option>Novo</option><option>Em andamento</option><option>Fechado</option><option>Perdido</option>
+          </select>
+        </div>
+        <div class="field"><label>Valor do negocio (R$)</label><input type="number" id="modal-valor" placeholder="Ex: 1500.00" oninput="saveLeadData()" /></div>
+        <div class="field"><label>Anotacoes</label><textarea id="modal-notes" rows="8" placeholder="Anotacoes sobre esse lead..." oninput="saveLeadData()"></textarea></div>
       </div>
-      <div class="field"><label>Status do negocio</label>
-        <select id="modal-status" onchange="saveLeadData()">
-          <option>Novo</option><option>Em andamento</option><option>Fechado</option><option>Perdido</option>
-        </select>
+      <div class="chat-panel">
+        <div class="chat-toolbar">
+          <div>
+            <div class="chat-title">Conversa</div>
+            <div class="time-text" id="modal-chat-subtitle">Carregando historico</div>
+          </div>
+          <button class="btn btn-ghost" onclick="refreshConversation()">Atualizar conversa</button>
+        </div>
+        <div class="msgs-list" id="modal-msgs"></div>
       </div>
-      <div class="field"><label>Valor do negocio (R$)</label><input type="number" id="modal-valor" placeholder="Ex: 1500.00" oninput="saveLeadData()" /></div>
-      <div class="field"><label>Anotacoes</label><textarea id="modal-notes" rows="3" placeholder="Anotacoes sobre esse lead..." oninput="saveLeadData()"></textarea></div>
-      <div class="field"><label>Ultimas mensagens</label><div class="msgs-list" id="modal-msgs"></div></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
@@ -311,15 +329,30 @@ async function openLead(encodedId) {
   document.getElementById('modal-valor').value = currentLead.valor||'';
   document.getElementById('modal-notes').value = currentLead.notes||'';
   document.getElementById('modal').style.display = 'flex';
+  await refreshConversation();
+}
+
+async function refreshConversation() {
+  if (!currentLead) return;
   document.getElementById('modal-msgs').innerHTML = '<div style="color:#6b7280;font-size:12px;text-align:center;padding:12px;"><div class="spinner"></div></div>';
+  document.getElementById('modal-chat-subtitle').textContent = 'Buscando mensagens...';
   try {
-    const list = await apiGet(`/api/leads/${encodeURIComponent(currentLead.id)}/messages`);
-    if (!list.length) { document.getElementById('modal-msgs').innerHTML = '<div style="color:#6b7280;font-size:12px;text-align:center;padding:12px;">Sem mensagens</div>'; return; }
-    document.getElementById('modal-msgs').innerHTML = list.slice(-15).map(m => {
-      const ts = m.ts?new Date(m.ts*1000).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
+    const list = await apiGet(`/api/leads/${encodeURIComponent(currentLead.id)}/messages?offset=100`);
+    document.getElementById('modal-chat-subtitle').textContent = `${list.length} mensagens carregadas`;
+    if (!list.length) {
+      document.getElementById('modal-msgs').innerHTML = '<div style="color:#6b7280;font-size:12px;text-align:center;padding:12px;">Sem mensagens encontradas para este contato.</div>';
+      return;
+    }
+    document.getElementById('modal-msgs').innerHTML = list.map(m => {
+      const ts = m.ts?new Date(m.ts*1000).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
       return `<div class="msg-bubble ${m.fromMe?'out':'in'}">${escapeHtml(m.text)}<div class="ts">${ts}</div></div>`;
     }).join('');
-  } catch(e) { document.getElementById('modal-msgs').innerHTML = '<div style="color:#f87171;font-size:12px;text-align:center;">Erro ao carregar mensagens</div>'; }
+    const box = document.getElementById('modal-msgs');
+    box.scrollTop = box.scrollHeight;
+  } catch(e) {
+    document.getElementById('modal-chat-subtitle').textContent = 'Erro ao carregar';
+    document.getElementById('modal-msgs').innerHTML = '<div style="color:#f87171;font-size:12px;text-align:center;">Erro ao carregar mensagens</div>';
+  }
 }
 
 async function saveLeadData() {

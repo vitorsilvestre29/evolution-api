@@ -66,9 +66,16 @@ function getMessageText(message = {}) {
     message.extendedTextMessage?.text ||
     message.imageMessage?.caption ||
     message.videoMessage?.caption ||
+    message.buttonsResponseMessage?.selectedDisplayText ||
+    message.listResponseMessage?.title ||
+    message.templateButtonReplyMessage?.selectedDisplayText ||
+    message.reactionMessage?.text ||
+    message.documentMessage?.caption ||
     (message.audioMessage ? 'Audio' : '') ||
     (message.imageMessage ? 'Imagem' : '') ||
     (message.videoMessage ? 'Video' : '') ||
+    (message.documentMessage ? 'Documento' : '') ||
+    (message.stickerMessage ? 'Figurinha' : '') ||
     'Mensagem'
   );
 }
@@ -273,11 +280,13 @@ app.get('/api/leads/:id/messages', async (req, res) => {
   const id = decodeURIComponent(req.params.id);
   const { instance, jid } = splitLeadKey(id);
   const db = readDb();
+  const offset = Math.min(Math.max(Number(req.query.offset) || 80, 1), 200);
+  const page = Math.max(Number(req.query.page) || 1, 1);
 
   try {
     const response = await evolution(`/chat/findMessages/${encodeURIComponent(instance)}`, {
       method: 'POST',
-      body: JSON.stringify({ where: { key: { remoteJid: jid } }, limit: 30 }),
+      body: JSON.stringify({ where: { key: { remoteJid: jid } }, offset, page }),
     }, instance);
     const records = response?.messages?.records || response?.records || response?.messages || [];
     for (const message of records) appendMessage(db, instance, jid, message);
