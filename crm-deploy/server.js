@@ -1,7 +1,9 @@
 const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs');
+const fsp = require('fs/promises');
 const path = require('path');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,8 +17,18 @@ const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 const SESSION_SECRET = process.env.CRM_SESSION_SECRET || WEBHOOK_SECRET || 'change-me';
 const ADMIN_USER = process.env.CRM_ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.CRM_ADMIN_PASSWORD || '';
+const DATABASE_URL = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'crm.json');
+const pgPool = DATABASE_URL
+  ? new Pool({
+      connectionString: DATABASE_URL,
+      ssl:
+        process.env.PGSSLMODE === 'require' || DATABASE_URL.includes('sslmode=require')
+          ? { rejectUnauthorized: false }
+          : false,
+    })
+  : null;
 
 let EVOLUTION_API_KEYS = {};
 try {
@@ -101,8 +113,8 @@ function readSession(req) {
   }
 }
 
-function getUsers() {
-  const db = readDb();
+async function getUsers() {
+  const db = await readDb();
   const clients = Array.isArray(CRM_CLIENTS) ? CRM_CLIENTS : [];
   const users = clients.map((client) => ({
     id: client.username,
@@ -146,8 +158,9 @@ function verifyUserLogin(user, password) {
   return user.password === password;
 }
 
-function getClientSummaries() {
-  return getUsers()
+async function getClientSummaries() {
+  const users = await getUsers();
+  return users
     .filter((user) => user.role === 'client')
     .map((user) => ({
       id: user.id,
@@ -174,25 +187,62 @@ function canAccessInstance(user, instanceName) {
   return user?.role === 'admin' || user?.instances?.includes(instanceName);
 }
 
-function ensureDb() {
+function defaultDb() {
+  return { leads: {}, messages: {}, users: [] };
+}
+
+async function ensureDb() {
+  if (pgPool) {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS crm_state (
+        id TEXT PRIMARY KEY,
+        data JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pgPool.query(
+      `INSERT INTO crm_state (id, data)
+       VALUES ('main', $1::jsonb)
+       ON CONFLICT (id) DO NOTHING`,
+      [JSON.stringify(defaultDb())],
+    );
+    return;
+  }
+
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify({ leads: {}, messages: {}, users: [] }, null, 2));
+    await fsp.writeFile(DB_FILE, JSON.stringify(defaultDb(), null, 2));
   }
 }
 
-function readDb() {
-  ensureDb();
-  const db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+async function readDb() {
+  await ensureDb();
+  let db;
+  if (pgPool) {
+    const result = await pgPool.query('SELECT data FROM crm_state WHERE id = $1', ['main']);
+    db = result.rows[0]?.data || defaultDb();
+  } else {
+    db = JSON.parse(await fsp.readFile(DB_FILE, 'utf8'));
+  }
   db.leads = db.leads || {};
   db.messages = db.messages || {};
   db.users = Array.isArray(db.users) ? db.users : [];
   return db;
 }
 
-function writeDb(db) {
-  ensureDb();
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+async function writeDb(db) {
+  await ensureDb();
+  if (pgPool) {
+    await pgPool.query(
+      `INSERT INTO crm_state (id, data, updated_at)
+       VALUES ('main', $1::jsonb, NOW())
+       ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()`,
+      [JSON.stringify(db)],
+    );
+    return;
+  }
+
+  await fsp.writeFile(DB_FILE, JSON.stringify(db, null, 2));
 }
 
 function leadKey(instance, jid) {
@@ -338,7 +388,7 @@ async function getConfiguredInstances() {
 }
 
 async function syncFromEvolution(user = null) {
-  const db = readDb();
+  const db = await readDb();
   const allInstances = await getConfiguredInstances();
   const instances = user
     ? allInstances.filter((instance) => canAccessInstance(user, instance.name))
@@ -378,14 +428,15 @@ async function syncFromEvolution(user = null) {
     }
   }
 
-  writeDb(db);
+  await writeDb(db);
   const allowedLeads = Object.values(db.leads).filter((lead) => !user || canAccessInstance(user, lead.instance));
   return { instances, leads: allowedLeads };
 }
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, password } = req.body || {};
-  const user = getUsers().find((item) => item.username === username && verifyUserLogin(item, password));
+  const users = await getUsers();
+  const user = users.find((item) => item.username === username && verifyUserLogin(item, password));
   if (!user) return res.status(401).json({ message: 'Usuario ou senha invalidos' });
 
   const publicUser = {
@@ -408,27 +459,28 @@ app.post('/api/logout', (_req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/me', requireAuth, (req, res) => {
-  const clients = getClientSummaries();
+app.get('/api/me', requireAuth, async (req, res) => {
+  const clients = await getClientSummaries();
   res.json({ user: req.user, clients: req.user.role === 'admin' ? clients : [] });
 });
 
-app.get('/api/users', requireAuth, requireAdmin, (_req, res) => {
-  res.json({ users: getClientSummaries() });
+app.get('/api/users', requireAuth, requireAdmin, async (_req, res) => {
+  res.json({ users: await getClientSummaries() });
 });
 
-app.post('/api/users', requireAuth, requireAdmin, (req, res) => {
+app.post('/api/users', requireAuth, requireAdmin, async (req, res) => {
   const { name, username, password, instances } = req.body || {};
   const cleanUsername = String(username || '').trim();
   const cleanName = String(name || cleanUsername).trim();
   const cleanInstances = Array.isArray(instances) ? instances.filter(Boolean) : [];
 
   if (!cleanUsername || !password) return res.status(400).json({ message: 'Usuario e senha sao obrigatorios' });
-  if (getUsers().some((user) => user.username === cleanUsername)) {
+  const users = await getUsers();
+  if (users.some((user) => user.username === cleanUsername)) {
     return res.status(409).json({ message: 'Ja existe usuario com esse login' });
   }
 
-  const db = readDb();
+  const db = await readDb();
   const user = {
     id: crypto.randomUUID(),
     name: cleanName,
@@ -439,17 +491,19 @@ app.post('/api/users', requireAuth, requireAdmin, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   db.users.push(user);
-  writeDb(db);
-  res.status(201).json({ user: getClientSummaries().find((item) => item.id === user.id) });
+  await writeDb(db);
+  const clients = await getClientSummaries();
+  res.status(201).json({ user: clients.find((item) => item.id === user.id) });
 });
 
-app.patch('/api/users/:id', requireAuth, requireAdmin, (req, res) => {
-  const db = readDb();
+app.patch('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
+  const db = await readDb();
   const user = db.users.find((item) => item.id === req.params.id);
   if (!user) return res.status(404).json({ message: 'Usuario nao encontrado ou gerenciado por variable' });
 
   const { name, username, password, instances } = req.body || {};
-  if (username && username !== user.username && getUsers().some((item) => item.username === username)) {
+  const users = await getUsers();
+  if (username && username !== user.username && users.some((item) => item.username === username)) {
     return res.status(409).json({ message: 'Ja existe usuario com esse login' });
   }
 
@@ -458,16 +512,17 @@ app.patch('/api/users/:id', requireAuth, requireAdmin, (req, res) => {
   if (password) user.passwordHash = hashPassword(password);
   if (Array.isArray(instances)) user.instances = instances.filter(Boolean);
   user.updatedAt = new Date().toISOString();
-  writeDb(db);
-  res.json({ user: getClientSummaries().find((item) => item.id === user.id) });
+  await writeDb(db);
+  const clients = await getClientSummaries();
+  res.json({ user: clients.find((item) => item.id === user.id) });
 });
 
-app.delete('/api/users/:id', requireAuth, requireAdmin, (req, res) => {
-  const db = readDb();
+app.delete('/api/users/:id', requireAuth, requireAdmin, async (req, res) => {
+  const db = await readDb();
   const before = db.users.length;
   db.users = db.users.filter((item) => item.id !== req.params.id);
   if (db.users.length === before) return res.status(404).json({ message: 'Usuario nao encontrado ou gerenciado por variable' });
-  writeDb(db);
+  await writeDb(db);
   res.json({ ok: true });
 });
 
@@ -498,12 +553,12 @@ app.get('/api/leads', requireAuth, async (req, res) => {
   }
 });
 
-app.patch('/api/leads/:id', requireAuth, (req, res) => {
+app.patch('/api/leads/:id', requireAuth, async (req, res) => {
   const id = decodeURIComponent(req.params.id);
   const { instance } = splitLeadKey(id);
   if (!canAccessInstance(req.user, instance)) return res.status(403).json({ message: 'Sem acesso a este cliente' });
 
-  const db = readDb();
+  const db = await readDb();
   if (!db.leads[id]) return res.status(404).json({ message: 'Lead nao encontrado' });
 
   const allowed = ['status', 'valor', 'notes'];
@@ -511,7 +566,7 @@ app.patch('/api/leads/:id', requireAuth, (req, res) => {
     if (Object.prototype.hasOwnProperty.call(req.body, field)) db.leads[id][field] = req.body[field] || '';
   }
   db.leads[id].updatedAt = new Date().toISOString();
-  writeDb(db);
+  await writeDb(db);
   res.json(db.leads[id]);
 });
 
@@ -520,7 +575,7 @@ app.get('/api/leads/:id/messages', requireAuth, async (req, res) => {
   const { instance, jid } = splitLeadKey(id);
   if (!canAccessInstance(req.user, instance)) return res.status(403).json({ message: 'Sem acesso a esta conversa' });
 
-  const db = readDb();
+  const db = await readDb();
   const offset = Math.min(Math.max(Number(req.query.offset) || 80, 1), 200);
   const pages = Math.min(Math.max(Number(req.query.pages) || 5, 1), 10);
 
@@ -536,7 +591,7 @@ app.get('/api/leads/:id/messages', requireAuth, async (req, res) => {
       const totalPages = response?.messages?.pages || response?.pages || pages;
       if (page >= totalPages) break;
     }
-    writeDb(db);
+    await writeDb(db);
   } catch (error) {
     console.warn(`Nao foi possivel buscar mensagens de ${id}:`, error.message);
   }
@@ -549,13 +604,13 @@ app.get('/api/leads/:id/messages', requireAuth, async (req, res) => {
       messageTimestamp: lead.lastTs,
       key: { fromMe: lead.lastFromMe },
     });
-    writeDb(db);
+    await writeDb(db);
   }
 
   res.json((db.messages[id] || []).sort((a, b) => a.ts - b.ts));
 });
 
-app.post('/webhook/evolution', (req, res) => {
+app.post('/webhook/evolution', async (req, res) => {
   if (WEBHOOK_SECRET) {
     const token = req.get('x-webhook-secret') || req.query.secret;
     if (token !== WEBHOOK_SECRET) return res.status(401).json({ message: 'Webhook nao autorizado' });
@@ -564,7 +619,7 @@ app.post('/webhook/evolution', (req, res) => {
   const payload = req.body || {};
   const instance = payload.instance || payload.instanceName || payload.data?.instance || payload.sender || 'default';
   const records = Array.isArray(payload.data) ? payload.data : [payload.data || payload];
-  const db = readDb();
+  const db = await readDb();
   let saved = 0;
 
   for (const record of records) {
@@ -574,7 +629,7 @@ app.post('/webhook/evolution', (req, res) => {
     saved += 1;
   }
 
-  writeDb(db);
+  await writeDb(db);
   res.json({ ok: true, saved });
 });
 
