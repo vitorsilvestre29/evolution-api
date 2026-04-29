@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CRM — Evolution API</title>
+<title>Evolution CRM</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e1e1e1; min-height: 100vh; }
+  body { font-family: "Segoe UI", sans-serif; background: #0f1117; color: #e1e1e1; min-height: 100vh; }
   .topbar { background: #1a1d2e; border-bottom: 1px solid #2a2d3e; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
   .topbar h1 { font-size: 20px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px; }
   .topbar-right { display: flex; gap: 12px; align-items: center; }
@@ -28,24 +28,24 @@
   .sidebar-item .dot.off { background: #6b7280; }
   .sidebar-count { margin-left: auto; background: #2a2d3e; padding: 1px 7px; border-radius: 10px; font-size: 11px; }
   .main { flex: 1; overflow-y: auto; padding: 24px 28px; }
-  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-  .stat-card { background: #1a1d2e; border-radius: 12px; padding: 20px; border: 1px solid #2a2d3e; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: #1a1d2e; border-radius: 8px; padding: 20px; border: 1px solid #2a2d3e; }
   .stat-card .label { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
   .stat-card .value { font-size: 32px; font-weight: 800; margin-top: 6px; }
   .stat-card .sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
-  .c-total { color: #818cf8; } .c-new { color: #60a5fa; } .c-fechado { color: #34d399; }
+  .c-total { color: #818cf8; } .c-new { color: #60a5fa; } .c-fechado { color: #34d399; } .c-alert { color: #fbbf24; }
   .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
   .search-box { flex: 1; background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 8px; padding: 8px 14px; color: #fff; font-size: 13px; outline: none; min-width: 180px; }
   .search-box:focus { border-color: #4f46e5; }
   .filter-select { background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 13px; outline: none; cursor: pointer; }
-  .table-wrap { background: #1a1d2e; border-radius: 12px; border: 1px solid #2a2d3e; overflow: hidden; }
+  .table-wrap { background: #1a1d2e; border-radius: 8px; border: 1px solid #2a2d3e; overflow: hidden; }
   table { width: 100%; border-collapse: collapse; }
   thead th { background: #141624; padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid #2a2d3e; }
   tbody tr { border-bottom: 1px solid #1e2135; cursor: pointer; transition: background .15s; }
   tbody tr:hover { background: #22263a; }
   tbody tr:last-child { border-bottom: none; }
   td { padding: 14px 16px; font-size: 13px; vertical-align: middle; }
-  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #4f46e5, #7c3aed); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff; flex-shrink: 0; overflow: hidden; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #4f46e5, #0f766e); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff; flex-shrink: 0; overflow: hidden; }
   .avatar img { width: 100%; height: 100%; object-fit: cover; }
   .lead-name { font-weight: 600; color: #fff; }
   .lead-phone { font-size: 11px; color: #6b7280; margin-top: 2px; }
@@ -54,11 +54,12 @@
   .pill-andamento { background: #3b2f00; color: #fbbf24; }
   .pill-fechado { background: #064e3b; color: #34d399; }
   .pill-perdido { background: #450a0a; color: #f87171; }
-  .pill-bot { background: #2e1065; color: #a78bfa; }
+  .pill-bot { background: #164e63; color: #67e8f9; }
+  .pill-waiting { background: #3b2f00; color: #fbbf24; }
   .time-text { color: #6b7280; font-size: 12px; }
-  .msg-preview { color: #9ca3af; font-size: 12px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msg-preview { color: #9ca3af; font-size: 12px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .modal { background: #1a1d2e; border-radius: 16px; border: 1px solid #2a2d3e; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+  .modal { background: #1a1d2e; border-radius: 8px; border: 1px solid #2a2d3e; width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; }
   .modal-header { padding: 20px 24px; border-bottom: 1px solid #2a2d3e; display: flex; align-items: center; justify-content: space-between; }
   .modal-header h2 { font-size: 16px; font-weight: 700; }
   .modal-close { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 20px; line-height: 1; }
@@ -68,60 +69,66 @@
   .field input, .field textarea, .field select { width: 100%; background: #141624; border: 1px solid #2a2d3e; border-radius: 8px; padding: 10px 12px; color: #fff; font-size: 13px; outline: none; font-family: inherit; resize: vertical; }
   .field input:focus, .field textarea:focus, .field select:focus { border-color: #4f46e5; }
   .modal-footer { padding: 16px 24px; border-top: 1px solid #2a2d3e; display: flex; gap: 10px; justify-content: flex-end; }
-  .msgs-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+  .msgs-list { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
   .msg-bubble { padding: 8px 12px; border-radius: 10px; font-size: 12px; max-width: 85%; }
   .msg-bubble.in { background: #22263a; align-self: flex-start; }
   .msg-bubble.out { background: #1e3a5f; align-self: flex-end; }
-  .msg-bubble .ts { font-size: 10px; color: #6b7280; margin-top: 3px; }
+  .msg-bubble .ts { font-size: 10px; color: #9ca3af; margin-top: 3px; }
   .empty { text-align: center; padding: 60px 20px; color: #6b7280; }
-  .empty .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty .icon { font-size: 38px; margin-bottom: 12px; }
   .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #2a2d3e; border-top-color: #4f46e5; border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .loading-row td { text-align: center; padding: 40px; }
+  @media (max-width: 900px) {
+    .layout { display: block; height: auto; }
+    .sidebar { width: 100%; border-right: 0; border-bottom: 1px solid #2a2d3e; }
+    .stats-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+    .table-wrap { overflow-x: auto; }
+  }
 </style>
 </head>
 <body>
 <div class="topbar">
-  <h1><span>🤖</span> Evolution CRM</h1>
+  <h1><span>CRM</span> Evolution CRM</h1>
   <div class="topbar-right">
-    <span id="api-status" class="badge-status badge-offline">● Verificando...</span>
-    <button class="btn btn-primary" onclick="loadLeads()">⟳ Atualizar</button>
+    <span id="api-status" class="badge-status badge-offline">Verificando</span>
+    <button class="btn btn-primary" onclick="loadLeads()">Atualizar</button>
   </div>
 </div>
 <div class="layout">
   <div class="sidebar">
-    <div class="sidebar-label">Instâncias</div>
+    <div class="sidebar-label">Instancias</div>
     <div class="sidebar-item active" onclick="filterInstance('all', this)">
-      <span>📊</span> Todos os Leads
+      <span>Todos</span>
       <span class="sidebar-count" id="count-all">0</span>
     </div>
     <div id="instance-list"></div>
     <div class="sidebar-label" style="margin-top:16px;">Status</div>
-    <div class="sidebar-item" onclick="filterStatus('Novo', this)"><span>🔵</span> Novos <span class="sidebar-count" id="count-Novo">0</span></div>
-    <div class="sidebar-item" onclick="filterStatus('Em andamento', this)"><span>🟡</span> Em andamento <span class="sidebar-count" id="count-Em andamento">0</span></div>
-    <div class="sidebar-item" onclick="filterStatus('Fechado', this)"><span>🟢</span> Fechados <span class="sidebar-count" id="count-Fechado">0</span></div>
-    <div class="sidebar-item" onclick="filterStatus('Perdido', this)"><span>🔴</span> Perdidos <span class="sidebar-count" id="count-Perdido">0</span></div>
+    <div class="sidebar-item" onclick="filterStatus('Novo', this)"><span>Novos</span><span class="sidebar-count" id="count-Novo">0</span></div>
+    <div class="sidebar-item" onclick="filterStatus('Em andamento', this)"><span>Em andamento</span><span class="sidebar-count" id="count-Em andamento">0</span></div>
+    <div class="sidebar-item" onclick="filterStatus('Fechado', this)"><span>Fechados</span><span class="sidebar-count" id="count-Fechado">0</span></div>
+    <div class="sidebar-item" onclick="filterStatus('Perdido', this)"><span>Perdidos</span><span class="sidebar-count" id="count-Perdido">0</span></div>
   </div>
   <div class="main">
     <div class="stats-grid">
       <div class="stat-card"><div class="label">Total de Leads</div><div class="value c-total" id="stat-total">0</div><div class="sub">todos os bots</div></div>
       <div class="stat-card"><div class="label">Novos</div><div class="value c-new" id="stat-new">0</div><div class="sub">aguardando atendimento</div></div>
-      <div class="stat-card"><div class="label">Fechados</div><div class="value c-fechado" id="stat-fechado">0</div><div class="sub">negócios fechados</div></div>
+      <div class="stat-card"><div class="label">Fechados</div><div class="value c-fechado" id="stat-fechado">0</div><div class="sub">negocios fechados</div></div>
       <div class="stat-card"><div class="label">Taxa de Fechamento</div><div class="value c-fechado" id="stat-taxa">0%</div><div class="sub">fechados / total</div></div>
     </div>
     <div class="toolbar">
-      <input class="search-box" type="text" placeholder="🔍 Buscar por nome ou número..." oninput="renderTable()" id="search-input" />
+      <input class="search-box" type="text" placeholder="Buscar por nome ou numero..." oninput="renderTable()" id="search-input" />
       <select class="filter-select" onchange="renderTable()" id="filter-status-sel">
         <option value="">Todos os status</option>
         <option>Novo</option><option>Em andamento</option><option>Fechado</option><option>Perdido</option>
       </select>
       <select class="filter-select" onchange="renderTable()" id="filter-inst-sel">
-        <option value="">Todas as instâncias</option>
+        <option value="">Todas as instancias</option>
       </select>
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Lead</th><th>Bot / Instância</th><th>Status</th><th>Última mensagem</th><th>Quando</th><th>Ação</th></tr></thead>
+        <thead><tr><th>Lead</th><th>Bot / Instancia</th><th>Status</th><th>Ultima mensagem</th><th>Quando</th><th>Acao</th></tr></thead>
         <tbody id="leads-tbody"><tr class="loading-row"><td colspan="6"><div class="spinner"></div> Carregando leads...</td></tr></tbody>
       </table>
     </div>
@@ -129,7 +136,7 @@
 </div>
 <div class="modal-bg" id="modal" style="display:none;" onclick="if(event.target===this)closeModal()">
   <div class="modal">
-    <div class="modal-header"><h2 id="modal-title">Lead</h2><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-header"><h2 id="modal-title">Lead</h2><button class="modal-close" onclick="closeModal()">x</button></div>
     <div class="modal-body">
       <div style="display:flex;gap:12px;align-items:center;">
         <div class="avatar" id="modal-avatar" style="width:52px;height:52px;font-size:20px;"></div>
@@ -139,85 +146,84 @@
           <div style="font-size:12px;color:#6b7280;" id="modal-inst"></div>
         </div>
       </div>
-      <div class="field"><label>Status do Negócio</label>
+      <div class="field"><label>Status do negocio</label>
         <select id="modal-status" onchange="saveLeadData()">
           <option>Novo</option><option>Em andamento</option><option>Fechado</option><option>Perdido</option>
         </select>
       </div>
-      <div class="field"><label>Valor do Negócio (R$)</label><input type="number" id="modal-valor" placeholder="Ex: 1500.00" oninput="saveLeadData()" /></div>
-      <div class="field"><label>Anotações</label><textarea id="modal-notes" rows="3" placeholder="Anotações sobre esse lead..." oninput="saveLeadData()"></textarea></div>
-      <div class="field"><label>Últimas Mensagens</label><div class="msgs-list" id="modal-msgs"></div></div>
+      <div class="field"><label>Valor do negocio (R$)</label><input type="number" id="modal-valor" placeholder="Ex: 1500.00" oninput="saveLeadData()" /></div>
+      <div class="field"><label>Anotacoes</label><textarea id="modal-notes" rows="3" placeholder="Anotacoes sobre esse lead..." oninput="saveLeadData()"></textarea></div>
+      <div class="field"><label>Ultimas mensagens</label><div class="msgs-list" id="modal-msgs"></div></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal()">Fechar</button>
-      <button class="btn btn-primary" onclick="openWhatsApp()">💬 Abrir no WhatsApp</button>
+      <button class="btn btn-primary" onclick="openWhatsApp()">Abrir no WhatsApp</button>
     </div>
   </div>
 </div>
 <script>
-const API_BASE = 'https://evolution-api-production-d8a8.up.railway.app';
-const API_KEY  = 'minhachaveapi123';
 let allLeads = [], instances = [], activeInstanceFilter = 'all', activeStatusFilter = '', currentLead = null;
-const crmData = JSON.parse(localStorage.getItem('evo_crm') || '{}');
-function saveCRM() { localStorage.setItem('evo_crm', JSON.stringify(crmData)); }
-async function apiGet(p) { return (await fetch(API_BASE+p,{headers:{apikey:API_KEY}})).json(); }
-async function apiPost(p,b) { return (await fetch(API_BASE+p,{method:'POST',headers:{apikey:API_KEY,'Content-Type':'application/json'},body:JSON.stringify(b)})).json(); }
+
+async function apiGet(path) {
+  const response = await fetch(path);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Erro na API do CRM');
+  return data;
+}
+
+async function apiPatch(path, body) {
+  const response = await fetch(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Erro ao salvar lead');
+  return data;
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+}
 
 async function init() {
   try {
-    const insts = await apiGet('/instance/fetchInstances');
-    instances = Array.isArray(insts) ? insts : [];
-    renderInstances();
-    document.getElementById('api-status').textContent = '● Online';
-    document.getElementById('api-status').className = 'badge-status badge-online';
     await loadLeads();
+    document.getElementById('api-status').textContent = 'Online';
+    document.getElementById('api-status').className = 'badge-status badge-online';
   } catch(e) {
-    document.getElementById('api-status').textContent = '● Offline';
+    document.getElementById('api-status').textContent = 'Offline';
     document.getElementById('api-status').className = 'badge-status badge-offline';
-    document.getElementById('leads-tbody').innerHTML = `<tr class="loading-row"><td colspan="6" style="color:#f87171;">❌ Erro ao conectar na Evolution API.</td></tr>`;
+    document.getElementById('leads-tbody').innerHTML = `<tr class="loading-row"><td colspan="6" style="color:#f87171;">Erro ao conectar. Verifique EVOLUTION_API_URL e EVOLUTION_API_KEY no Railway.</td></tr>`;
   }
 }
 
 function renderInstances() {
   const list = document.getElementById('instance-list');
   const sel  = document.getElementById('filter-inst-sel');
-  list.innerHTML = ''; sel.innerHTML = '<option value="">Todas as instâncias</option>';
+  list.innerHTML = ''; sel.innerHTML = '<option value="">Todas as instancias</option>';
   instances.forEach(inst => {
     const isOpen = inst.connectionStatus === 'open';
-    list.innerHTML += `<div class="sidebar-item" onclick="filterInstance('${inst.name}',this)"><span class="dot ${isOpen?'':'off'}"></span>${inst.name}<span class="sidebar-count" id="count-inst-${inst.name}">0</span></div>`;
-    sel.innerHTML += `<option value="${inst.name}">${inst.name}</option>`;
+    const name = escapeHtml(inst.name);
+    list.innerHTML += `<div class="sidebar-item" onclick="filterInstance('${name}',this)"><span class="dot ${isOpen?'':'off'}"></span>${name}<span class="sidebar-count" id="count-inst-${name}">0</span></div>`;
+    sel.innerHTML += `<option value="${name}">${name}</option>`;
   });
 }
 
 async function loadLeads() {
   document.getElementById('leads-tbody').innerHTML = `<tr class="loading-row"><td colspan="6"><div class="spinner"></div> Carregando...</td></tr>`;
-  allLeads = [];
-  for (const inst of instances) {
-    try {
-      const chats = await apiGet(`/chat/findChats/${encodeURIComponent(inst.name)}`);
-      const chatList = Array.isArray(chats) ? chats : (chats.chats || []);
-      chatList.forEach(chat => {
-        const jid = chat.id || chat.remoteJid || '';
-        if (jid.includes('@g.us') || jid.includes('status@')) return;
-        allLeads.push({
-          jid, name: chat.name || chat.pushName || jid.split('@')[0],
-          phone: jid.split('@')[0], instance: inst.name,
-          lastMsg: chat.lastMessage?.message?.conversation || chat.lastMessage?.message?.extendedTextMessage?.text || '—',
-          lastTs: chat.lastMessage?.messageTimestamp || 0,
-          profilePic: chat.profilePicUrl || null
-        });
-      });
-    } catch(e) {}
-  }
-  allLeads.sort((a,b) => b.lastTs - a.lastTs);
+  const data = await apiGet('/api/leads');
+  instances = Array.isArray(data.instances) ? data.instances : [];
+  allLeads = Array.isArray(data.leads) ? data.leads : [];
+  renderInstances();
   updateStats(); updateCounts(); renderTable();
 }
 
 function updateStats() {
   const total = allLeads.length;
-  const fechados = allLeads.filter(l => (crmData[l.jid]?.status||'Novo')==='Fechado').length;
+  const fechados = allLeads.filter(l => (l.status||'Novo')==='Fechado').length;
   document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-new').textContent = allLeads.filter(l => (crmData[l.jid]?.status||'Novo')==='Novo').length;
+  document.getElementById('stat-new').textContent = allLeads.filter(l => (l.status||'Novo')==='Novo').length;
   document.getElementById('stat-fechado').textContent = fechados;
   document.getElementById('stat-taxa').textContent = (total>0?Math.round(fechados/total*100):0)+'%';
 }
@@ -226,7 +232,7 @@ function updateCounts() {
   document.getElementById('count-all').textContent = allLeads.length;
   ['Novo','Em andamento','Fechado','Perdido'].forEach(s => {
     const el = document.getElementById('count-'+s);
-    if (el) el.textContent = allLeads.filter(l => (crmData[l.jid]?.status||'Novo')===s).length;
+    if (el) el.textContent = allLeads.filter(l => (l.status||'Novo')===s).length;
   });
   instances.forEach(inst => {
     const el = document.getElementById('count-inst-'+inst.name);
@@ -239,8 +245,8 @@ function renderTable() {
   const statusSel = document.getElementById('filter-status-sel').value;
   const instSel   = document.getElementById('filter-inst-sel').value;
   let filtered = allLeads.filter(l => {
-    const st = crmData[l.jid]?.status||'Novo';
-    if (search && !l.name.toLowerCase().includes(search) && !l.phone.includes(search)) return false;
+    const st = l.status||'Novo';
+    if (search && !String(l.name || '').toLowerCase().includes(search) && !String(l.phone || '').includes(search)) return false;
     if (statusSel && st !== statusSel) return false;
     if (instSel && l.instance !== instSel) return false;
     if (activeInstanceFilter !== 'all' && l.instance !== activeInstanceFilter) return false;
@@ -248,19 +254,21 @@ function renderTable() {
     return true;
   });
   const tbody = document.getElementById('leads-tbody');
-  if (!filtered.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="icon">🔍</div><p>Nenhum lead encontrado</p></div></td></tr>`; return; }
+  if (!filtered.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="icon">...</div><p>Nenhum lead encontrado</p></div></td></tr>`; return; }
   const pillMap = {'Novo':'pill-novo','Em andamento':'pill-andamento','Fechado':'pill-fechado','Perdido':'pill-perdido'};
   tbody.innerHTML = filtered.map(l => {
-    const cd = crmData[l.jid]||{}, status = cd.status||'Novo';
-    const initials = l.name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-    const ts = l.lastTs ? new Date(l.lastTs*1000).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
-    return `<tr onclick="openLead('${l.jid}')">
-      <td><div style="display:flex;gap:10px;align-items:center;"><div class="avatar">${l.profilePic?`<img src="${l.profilePic}" onerror="this.style.display='none'"/>`:''}${initials}</div><div><div class="lead-name">${l.name}</div><div class="lead-phone">+${l.phone}</div></div></div></td>
-      <td><span class="pill pill-bot">${l.instance}</span></td>
-      <td><select class="pill ${pillMap[status]||'pill-novo'}" style="border:none;cursor:pointer;background:none;font-weight:700;" onchange="quickStatus('${l.jid}',this.value,event)" onclick="event.stopPropagation()">${['Novo','Em andamento','Fechado','Perdido'].map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('')}</select></td>
-      <td><div class="msg-preview">${(l.lastMsg||'').slice(0,60)}</div></td>
+    const status = l.status||'Novo';
+    const initials = String(l.name || l.phone || '?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    const ts = l.lastTs ? new Date(l.lastTs*1000).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
+    const botState = l.lastFromMe ? 'Bot respondeu' : 'Aguardando resposta';
+    const botClass = l.lastFromMe ? 'pill-bot' : 'pill-waiting';
+    return `<tr onclick="openLead('${encodeURIComponent(l.id)}')">
+      <td><div style="display:flex;gap:10px;align-items:center;"><div class="avatar">${l.profilePic?`<img src="${escapeHtml(l.profilePic)}" onerror="this.style.display='none'"/>`:''}${escapeHtml(initials)}</div><div><div class="lead-name">${escapeHtml(l.name)}</div><div class="lead-phone">+${escapeHtml(l.phone)}</div></div></div></td>
+      <td><span class="pill pill-bot">${escapeHtml(l.instance)}</span></td>
+      <td><select class="pill ${pillMap[status]||'pill-novo'}" style="border:none;cursor:pointer;background:none;font-weight:700;" onchange="quickStatus('${encodeURIComponent(l.id)}',this.value,event)" onclick="event.stopPropagation()">${['Novo','Em andamento','Fechado','Perdido'].map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('')}</select></td>
+      <td><div class="msg-preview">${escapeHtml((l.lastMsg||'').slice(0,60))}<br><span class="pill ${botClass}">${botState}</span></div></td>
       <td><div class="time-text">${ts}</div></td>
-      <td><button class="btn btn-ghost" style="padding:5px 12px;font-size:11px;" onclick="openLead('${l.jid}');event.stopPropagation()">Ver</button></td>
+      <td><button class="btn btn-ghost" style="padding:5px 12px;font-size:11px;" onclick="openLead('${encodeURIComponent(l.id)}');event.stopPropagation()">Ver</button></td>
     </tr>`;
   }).join('');
 }
@@ -272,53 +280,63 @@ function filterInstance(name, el) {
   document.querySelectorAll('.sidebar-item').forEach(e=>e.classList.remove('active')); el.classList.add('active');
   renderTable();
 }
+
 function filterStatus(status, el) {
   activeStatusFilter = status; activeInstanceFilter = 'all';
   document.getElementById('filter-status-sel').value = status;
   document.querySelectorAll('.sidebar-item').forEach(e=>e.classList.remove('active')); el.classList.add('active');
   renderTable();
 }
-function quickStatus(jid, status, evt) {
+
+async function quickStatus(encodedId, status, evt) {
   evt.stopPropagation();
-  if (!crmData[jid]) crmData[jid] = {};
-  crmData[jid].status = status; saveCRM(); updateStats(); updateCounts(); renderTable();
+  const id = decodeURIComponent(encodedId);
+  const lead = allLeads.find(l => l.id === id);
+  if (!lead) return;
+  lead.status = status;
+  updateStats(); updateCounts(); renderTable();
+  try { await apiPatch(`/api/leads/${encodeURIComponent(id)}`, { status }); } catch(e) { console.warn(e); }
 }
 
-async function openLead(jid) {
-  currentLead = allLeads.find(l=>l.jid===jid); if (!currentLead) return;
-  const cd = crmData[jid]||{};
-  const initials = currentLead.name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+async function openLead(encodedId) {
+  const id = decodeURIComponent(encodedId);
+  currentLead = allLeads.find(l=>l.id===id); if (!currentLead) return;
+  const initials = String(currentLead.name || currentLead.phone || '?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
   document.getElementById('modal-title').textContent = currentLead.name;
   document.getElementById('modal-avatar').textContent = initials;
   document.getElementById('modal-name').textContent = currentLead.name;
   document.getElementById('modal-phone').textContent = '+'+currentLead.phone;
-  document.getElementById('modal-inst').textContent = '📱 '+currentLead.instance;
-  document.getElementById('modal-status').value = cd.status||'Novo';
-  document.getElementById('modal-valor').value = cd.valor||'';
-  document.getElementById('modal-notes').value = cd.notes||'';
+  document.getElementById('modal-inst').textContent = currentLead.instance;
+  document.getElementById('modal-status').value = currentLead.status||'Novo';
+  document.getElementById('modal-valor').value = currentLead.valor||'';
+  document.getElementById('modal-notes').value = currentLead.notes||'';
   document.getElementById('modal').style.display = 'flex';
   document.getElementById('modal-msgs').innerHTML = '<div style="color:#6b7280;font-size:12px;text-align:center;padding:12px;"><div class="spinner"></div></div>';
   try {
-    const msgs = await apiPost(`/chat/findMessages/${encodeURIComponent(currentLead.instance)}`,{where:{key:{remoteJid:jid}},limit:15});
-    const list = msgs.messages?.records||msgs.records||msgs.messages||[];
+    const list = await apiGet(`/api/leads/${encodeURIComponent(currentLead.id)}/messages`);
     if (!list.length) { document.getElementById('modal-msgs').innerHTML = '<div style="color:#6b7280;font-size:12px;text-align:center;padding:12px;">Sem mensagens</div>'; return; }
     document.getElementById('modal-msgs').innerHTML = list.slice(-15).map(m => {
-      const text = m.message?.conversation||m.message?.extendedTextMessage?.text||(m.message?.audioMessage?'🎵 Áudio':'')|| (m.message?.imageMessage?'📷 Imagem':'—');
-      const ts = m.messageTimestamp?new Date(m.messageTimestamp*1000).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
-      return `<div class="msg-bubble ${m.key?.fromMe?'out':'in'}">${text}<div class="ts">${ts}</div></div>`;
+      const ts = m.ts?new Date(m.ts*1000).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
+      return `<div class="msg-bubble ${m.fromMe?'out':'in'}">${escapeHtml(m.text)}<div class="ts">${ts}</div></div>`;
     }).join('');
   } catch(e) { document.getElementById('modal-msgs').innerHTML = '<div style="color:#f87171;font-size:12px;text-align:center;">Erro ao carregar mensagens</div>'; }
 }
 
-function saveLeadData() {
+async function saveLeadData() {
   if (!currentLead) return;
-  const jid = currentLead.jid;
-  if (!crmData[jid]) crmData[jid] = {};
-  crmData[jid].status = document.getElementById('modal-status').value;
-  crmData[jid].valor  = document.getElementById('modal-valor').value;
-  crmData[jid].notes  = document.getElementById('modal-notes').value;
-  saveCRM(); updateStats(); updateCounts();
+  currentLead.status = document.getElementById('modal-status').value;
+  currentLead.valor  = document.getElementById('modal-valor').value;
+  currentLead.notes  = document.getElementById('modal-notes').value;
+  updateStats(); updateCounts();
+  try {
+    await apiPatch(`/api/leads/${encodeURIComponent(currentLead.id)}`, {
+      status: currentLead.status,
+      valor: currentLead.valor,
+      notes: currentLead.notes
+    });
+  } catch(e) { console.warn(e); }
 }
+
 function closeModal() { document.getElementById('modal').style.display='none'; currentLead=null; renderTable(); }
 function openWhatsApp() { if (currentLead) window.open(`https://wa.me/${currentLead.phone}`,'_blank'); }
 init();

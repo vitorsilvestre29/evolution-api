@@ -2,6 +2,9 @@
   "name": "evolution-crm",
   "version": "1.0.0",
   "description": "CRM para Evolution API",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node server.js"
   },

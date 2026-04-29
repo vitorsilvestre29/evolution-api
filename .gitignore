@@ -3,6 +3,8 @@ Baileys
 # compiled output
 /dist
 /node_modules
+/crm-deploy/node_modules
+/crm-deploy/data
 
 /Docker/.env
 
