@@ -254,6 +254,10 @@ function splitLeadKey(key) {
   return { instance, jid: jidParts.join('::') };
 }
 
+function jidToNumber(jid = '') {
+  return String(jid).split('@')[0].replace(/\D/g, '');
+}
+
 function getMessageText(message = {}) {
   return (
     message.conversation ||
@@ -296,6 +300,10 @@ function upsertLead(db, lead) {
     status: current.status || 'Novo',
     valor: current.valor || '',
     notes: current.notes || '',
+    area: current.area || '',
+    source: current.source || '',
+    campaign: current.campaign || '',
+    followUpAt: current.followUpAt || '',
     botReplied: typeof lead.botReplied === 'boolean' ? lead.botReplied : Boolean(current.botReplied),
     lastFromMe: typeof lead.lastFromMe === 'boolean' ? lead.lastFromMe : Boolean(current.lastFromMe),
     updatedAt: new Date().toISOString(),
@@ -433,6 +441,56 @@ async function syncFromEvolution(user = null) {
   return { instances, leads: allowedLeads };
 }
 
+function buildMetrics(leads) {
+  const total = leads.length;
+  const byStatus = {};
+  const byInstance = {};
+  let waitingReply = 0;
+  let closed = 0;
+  let estimatedRevenue = 0;
+
+  for (const lead of leads) {
+    const status = lead.status || 'Novo';
+    byStatus[status] = (byStatus[status] || 0) + 1;
+    byInstance[lead.instance] = byInstance[lead.instance] || {
+      instance: lead.instance,
+      total: 0,
+      closed: 0,
+      waitingReply: 0,
+      estimatedRevenue: 0,
+    };
+    byInstance[lead.instance].total += 1;
+
+    if (!lead.lastFromMe) {
+      waitingReply += 1;
+      byInstance[lead.instance].waitingReply += 1;
+    }
+    if (status === 'Fechado') {
+      closed += 1;
+      byInstance[lead.instance].closed += 1;
+    }
+
+    const value = Number(lead.valor || 0);
+    if (!Number.isNaN(value)) {
+      estimatedRevenue += value;
+      byInstance[lead.instance].estimatedRevenue += value;
+    }
+  }
+
+  return {
+    total,
+    closed,
+    waitingReply,
+    estimatedRevenue,
+    closeRate: total ? Math.round((closed / total) * 100) : 0,
+    byStatus,
+    byInstance: Object.values(byInstance).map((item) => ({
+      ...item,
+      closeRate: item.total ? Math.round((item.closed / item.total) * 100) : 0,
+    })),
+  };
+}
+
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body || {};
   const users = await getUsers();
@@ -547,7 +605,8 @@ app.get('/api/instances', requireAuth, async (req, res) => {
 app.get('/api/leads', requireAuth, async (req, res) => {
   try {
     const { instances, leads } = await syncFromEvolution(req.user);
-    res.json({ instances, leads: leads.sort((a, b) => b.lastTs - a.lastTs) });
+    const sortedLeads = leads.sort((a, b) => b.lastTs - a.lastTs);
+    res.json({ instances, leads: sortedLeads, metrics: buildMetrics(sortedLeads) });
   } catch (error) {
     res.status(error.status || 500).json({ message: error.message, details: error.body || null });
   }
@@ -561,13 +620,43 @@ app.patch('/api/leads/:id', requireAuth, async (req, res) => {
   const db = await readDb();
   if (!db.leads[id]) return res.status(404).json({ message: 'Lead nao encontrado' });
 
-  const allowed = ['status', 'valor', 'notes'];
+  const allowed = ['status', 'valor', 'notes', 'area', 'source', 'campaign', 'followUpAt'];
   for (const field of allowed) {
     if (Object.prototype.hasOwnProperty.call(req.body, field)) db.leads[id][field] = req.body[field] || '';
   }
   db.leads[id].updatedAt = new Date().toISOString();
   await writeDb(db);
   res.json(db.leads[id]);
+});
+
+app.post('/api/leads/:id/messages/send', requireAuth, async (req, res) => {
+  const id = decodeURIComponent(req.params.id);
+  const { instance, jid } = splitLeadKey(id);
+  if (!canAccessInstance(req.user, instance)) return res.status(403).json({ message: 'Sem acesso a esta conversa' });
+
+  const text = String(req.body?.text || '').trim();
+  if (!text) return res.status(400).json({ message: 'Digite uma mensagem' });
+
+  const db = await readDb();
+  if (!db.leads[id]) return res.status(404).json({ message: 'Lead nao encontrado' });
+
+  try {
+    const response = await evolution(`/message/sendText/${encodeURIComponent(instance)}`, {
+      method: 'POST',
+      body: JSON.stringify({ number: jidToNumber(jid), text }),
+    }, instance);
+
+    appendMessage(db, instance, jid, {
+      id: response?.key?.id || response?.messageId || `crm-${Date.now()}`,
+      message: { conversation: text },
+      messageTimestamp: Math.floor(Date.now() / 1000),
+      key: { fromMe: true },
+    });
+    await writeDb(db);
+    res.status(201).json({ ok: true, messages: (db.messages[id] || []).sort((a, b) => a.ts - b.ts) });
+  } catch (error) {
+    res.status(error.status || 500).json({ message: error.message, details: error.body || null });
+  }
 });
 
 app.get('/api/leads/:id/messages', requireAuth, async (req, res) => {
