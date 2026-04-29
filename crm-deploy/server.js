@@ -114,7 +114,7 @@ function appendMessage(db, instance, jid, rawMessage) {
   const key = leadKey(instance, jid);
   const message = rawMessage.message || rawMessage;
   const text = getMessageText(message);
-  const fromMe = Boolean(rawMessage.key?.fromMe || rawMessage.fromMe);
+  const fromMe = rawMessage.key?.fromMe === true || rawMessage.key?.fromMe === 'true' || rawMessage.fromMe === true;
   const ts = normalizeTimestamp(rawMessage.messageTimestamp || rawMessage.timestamp || rawMessage.createdAt);
   const msgId = rawMessage.key?.id || rawMessage.id || `${ts}-${fromMe}-${text.slice(0, 20)}`;
 
@@ -200,11 +200,14 @@ async function syncFromEvolution() {
       const chats = Array.isArray(chatsResponse) ? chatsResponse : chatsResponse?.chats || [];
 
       for (const chat of chats) {
-        const jid = chat.id || chat.remoteJid || chat.key?.remoteJid || '';
+        const jid = chat.remoteJid || chat.key?.remoteJid || chat.id || '';
         if (!jid || jid.includes('@g.us') || jid.includes('status@')) continue;
 
         const lastMessage = chat.lastMessage || {};
         const message = lastMessage.message || lastMessage;
+        if (lastMessage && Object.keys(lastMessage).length) {
+          appendMessage(db, instance.name, jid, lastMessage);
+        }
         upsertLead(db, {
           jid,
           name: chat.name || chat.pushName || jid.split('@')[0],
@@ -213,8 +216,8 @@ async function syncFromEvolution() {
           lastMsg: getMessageText(message),
           lastTs: normalizeTimestamp(lastMessage.messageTimestamp || chat.updatedAt),
           profilePic: chat.profilePicUrl || null,
-          lastFromMe: Boolean(lastMessage.key?.fromMe),
-          botReplied: Boolean(lastMessage.key?.fromMe),
+          lastFromMe: lastMessage.key?.fromMe === true || lastMessage.key?.fromMe === 'true',
+          botReplied: lastMessage.key?.fromMe === true || lastMessage.key?.fromMe === 'true',
         });
       }
     } catch (error) {
@@ -293,6 +296,17 @@ app.get('/api/leads/:id/messages', async (req, res) => {
     writeDb(db);
   } catch (error) {
     console.warn(`Nao foi possivel buscar mensagens de ${id}:`, error.message);
+  }
+
+  const lead = db.leads[id];
+  if (lead?.lastMsg && !(db.messages[id] || []).length) {
+    appendMessage(db, instance, jid, {
+      id: `lead-last-${lead.lastTs || Date.now()}`,
+      message: { conversation: lead.lastMsg },
+      messageTimestamp: lead.lastTs,
+      key: { fromMe: lead.lastFromMe },
+    });
+    writeDb(db);
   }
 
   res.json((db.messages[id] || []).sort((a, b) => a.ts - b.ts));
