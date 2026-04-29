@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -11,6 +12,9 @@ const EVOLUTION_INSTANCES = (process.env.EVOLUTION_INSTANCES || '')
   .map((name) => name.trim())
   .filter(Boolean);
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
+const SESSION_SECRET = process.env.CRM_SESSION_SECRET || WEBHOOK_SECRET || 'change-me';
+const ADMIN_USER = process.env.CRM_ADMIN_USER || 'admin';
+const ADMIN_PASSWORD = process.env.CRM_ADMIN_PASSWORD || '';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'crm.json');
 
@@ -21,6 +25,13 @@ try {
     : {};
 } catch (_error) {
   EVOLUTION_API_KEYS = {};
+}
+
+let CRM_CLIENTS = [];
+try {
+  CRM_CLIENTS = process.env.CRM_CLIENTS_JSON ? JSON.parse(process.env.CRM_CLIENTS_JSON) : [];
+} catch (_error) {
+  CRM_CLIENTS = [];
 }
 
 function envNameForInstance(instanceName) {
@@ -34,16 +45,149 @@ function envNameForInstance(instanceName) {
 
 app.use(express.json({ limit: '5mb' }));
 
+function parseCookies(header = '') {
+  return Object.fromEntries(
+    header
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const index = part.indexOf('=');
+        return [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
+      }),
+  );
+}
+
+function sign(value) {
+  return crypto.createHmac('sha256', SESSION_SECRET).update(value).digest('hex');
+}
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(String(password), salt, 100000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, passwordHash) {
+  const [salt, hash] = String(passwordHash || '').split(':');
+  if (!salt || !hash) return false;
+  const testHash = crypto.pbkdf2Sync(String(password), salt, 100000, 64, 'sha512').toString('hex');
+  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(testHash, 'hex'));
+}
+
+function createSession(user) {
+  const payload = Buffer.from(JSON.stringify({
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    instances: user.instances || [],
+    exp: Date.now() + 1000 * 60 * 60 * 12,
+  })).toString('base64url');
+  return `${payload}.${sign(payload)}`;
+}
+
+function readSession(req) {
+  const token = parseCookies(req.headers.cookie || '').crm_session;
+  if (!token || !token.includes('.')) return null;
+  const [payload, signature] = token.split('.');
+  if (signature !== sign(payload)) return null;
+
+  try {
+    const user = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (!user.exp || user.exp < Date.now()) return null;
+    return user;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function getUsers() {
+  const db = readDb();
+  const clients = Array.isArray(CRM_CLIENTS) ? CRM_CLIENTS : [];
+  const users = clients.map((client) => ({
+    id: client.username,
+    username: client.username,
+    password: client.password,
+    name: client.name || client.username,
+    role: 'client',
+    instances: Array.isArray(client.instances) ? client.instances : [],
+    source: 'env',
+  }));
+
+  for (const user of db.users || []) {
+    users.push({
+      id: user.id,
+      username: user.username,
+      passwordHash: user.passwordHash,
+      name: user.name || user.username,
+      role: 'client',
+      instances: Array.isArray(user.instances) ? user.instances : [],
+      source: 'db',
+    });
+  }
+
+  if (ADMIN_PASSWORD) {
+    users.push({
+      id: 'admin',
+      username: ADMIN_USER,
+      password: ADMIN_PASSWORD,
+      name: 'Administrador',
+      role: 'admin',
+      instances: [],
+      source: 'env',
+    });
+  }
+
+  return users;
+}
+
+function verifyUserLogin(user, password) {
+  if (user.passwordHash) return verifyPassword(password, user.passwordHash);
+  return user.password === password;
+}
+
+function getClientSummaries() {
+  return getUsers()
+    .filter((user) => user.role === 'client')
+    .map((user) => ({
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      instances: user.instances,
+      source: user.source,
+    }));
+}
+
+function requireAuth(req, res, next) {
+  const user = readSession(req);
+  if (!user) return res.status(401).json({ message: 'Login necessario' });
+  req.user = user;
+  next();
+}
+
+function requireAdmin(req, res, next) {
+  if (req.user?.role !== 'admin') return res.status(403).json({ message: 'Apenas admin pode fazer isso' });
+  next();
+}
+
+function canAccessInstance(user, instanceName) {
+  return user?.role === 'admin' || user?.instances?.includes(instanceName);
+}
+
 function ensureDb() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify({ leads: {}, messages: {} }, null, 2));
+    fs.writeFileSync(DB_FILE, JSON.stringify({ leads: {}, messages: {}, users: [] }, null, 2));
   }
 }
 
 function readDb() {
   ensureDb();
-  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  const db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  db.leads = db.leads || {};
+  db.messages = db.messages || {};
+  db.users = Array.isArray(db.users) ? db.users : [];
+  return db;
 }
 
 function writeDb(db) {
@@ -121,7 +265,7 @@ function appendMessage(db, instance, jid, rawMessage) {
   db.messages[key] = db.messages[key] || [];
   if (!db.messages[key].some((item) => item.id === msgId)) {
     db.messages[key].push({ id: msgId, text, fromMe, ts });
-    db.messages[key] = db.messages[key].sort((a, b) => a.ts - b.ts).slice(-80);
+    db.messages[key] = db.messages[key].sort((a, b) => a.ts - b.ts).slice(-5000);
   }
 
   return upsertLead(db, {
@@ -176,8 +320,7 @@ async function evolution(pathname, options = {}, instanceName = '') {
   return body;
 }
 
-async function syncFromEvolution() {
-  const db = readDb();
+async function getConfiguredInstances() {
   let instances = [];
 
   if (EVOLUTION_API_KEY) {
@@ -190,6 +333,16 @@ async function syncFromEvolution() {
     const names = EVOLUTION_INSTANCES.length ? EVOLUTION_INSTANCES : [...Object.keys(EVOLUTION_API_KEYS), ...envInstances];
     instances = names.map((name) => ({ name, connectionStatus: 'open' }));
   }
+
+  return instances;
+}
+
+async function syncFromEvolution(user = null) {
+  const db = readDb();
+  const allInstances = await getConfiguredInstances();
+  const instances = user
+    ? allInstances.filter((instance) => canAccessInstance(user, instance.name))
+    : allInstances;
 
   for (const instance of instances) {
     try {
@@ -226,47 +379,130 @@ async function syncFromEvolution() {
   }
 
   writeDb(db);
-  return { instances, leads: Object.values(db.leads) };
+  const allowedLeads = Object.values(db.leads).filter((lead) => !user || canAccessInstance(user, lead.instance));
+  return { instances, leads: allowedLeads };
 }
 
-app.get('/api/health', async (_req, res) => {
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body || {};
+  const user = getUsers().find((item) => item.username === username && verifyUserLogin(item, password));
+  if (!user) return res.status(401).json({ message: 'Usuario ou senha invalidos' });
+
+  const publicUser = {
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    instances: user.instances,
+  };
+  res.cookie('crm_session', createSession(publicUser), {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 1000 * 60 * 60 * 12,
+  });
+  res.json({ user: publicUser });
+});
+
+app.post('/api/logout', (_req, res) => {
+  res.clearCookie('crm_session');
+  res.json({ ok: true });
+});
+
+app.get('/api/me', requireAuth, (req, res) => {
+  const clients = getClientSummaries();
+  res.json({ user: req.user, clients: req.user.role === 'admin' ? clients : [] });
+});
+
+app.get('/api/users', requireAuth, requireAdmin, (_req, res) => {
+  res.json({ users: getClientSummaries() });
+});
+
+app.post('/api/users', requireAuth, requireAdmin, (req, res) => {
+  const { name, username, password, instances } = req.body || {};
+  const cleanUsername = String(username || '').trim();
+  const cleanName = String(name || cleanUsername).trim();
+  const cleanInstances = Array.isArray(instances) ? instances.filter(Boolean) : [];
+
+  if (!cleanUsername || !password) return res.status(400).json({ message: 'Usuario e senha sao obrigatorios' });
+  if (getUsers().some((user) => user.username === cleanUsername)) {
+    return res.status(409).json({ message: 'Ja existe usuario com esse login' });
+  }
+
+  const db = readDb();
+  const user = {
+    id: crypto.randomUUID(),
+    name: cleanName,
+    username: cleanUsername,
+    passwordHash: hashPassword(password),
+    instances: cleanInstances,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  db.users.push(user);
+  writeDb(db);
+  res.status(201).json({ user: getClientSummaries().find((item) => item.id === user.id) });
+});
+
+app.patch('/api/users/:id', requireAuth, requireAdmin, (req, res) => {
+  const db = readDb();
+  const user = db.users.find((item) => item.id === req.params.id);
+  if (!user) return res.status(404).json({ message: 'Usuario nao encontrado ou gerenciado por variable' });
+
+  const { name, username, password, instances } = req.body || {};
+  if (username && username !== user.username && getUsers().some((item) => item.username === username)) {
+    return res.status(409).json({ message: 'Ja existe usuario com esse login' });
+  }
+
+  if (name !== undefined) user.name = String(name).trim();
+  if (username !== undefined) user.username = String(username).trim();
+  if (password) user.passwordHash = hashPassword(password);
+  if (Array.isArray(instances)) user.instances = instances.filter(Boolean);
+  user.updatedAt = new Date().toISOString();
+  writeDb(db);
+  res.json({ user: getClientSummaries().find((item) => item.id === user.id) });
+});
+
+app.delete('/api/users/:id', requireAuth, requireAdmin, (req, res) => {
+  const db = readDb();
+  const before = db.users.length;
+  db.users = db.users.filter((item) => item.id !== req.params.id);
+  if (db.users.length === before) return res.status(404).json({ message: 'Usuario nao encontrado ou gerenciado por variable' });
+  writeDb(db);
+  res.json({ ok: true });
+});
+
+app.get('/api/health', requireAuth, async (req, res) => {
   try {
-    const data = await syncFromEvolution();
+    const data = await syncFromEvolution(req.user);
     res.json({ ok: true, instances: data.instances.length, leads: data.leads.length });
   } catch (error) {
     res.status(error.status || 500).json({ ok: false, message: error.message });
   }
 });
 
-app.get('/api/instances', async (_req, res) => {
+app.get('/api/instances', requireAuth, async (req, res) => {
   try {
-    if (EVOLUTION_API_KEY) {
-      const instances = await evolution('/instance/fetchInstances');
-      res.json(Array.isArray(instances) ? instances : []);
-      return;
-    }
-
-    const envInstances = Object.keys(process.env)
-      .filter((name) => name.startsWith('EVOLUTION_API_KEY_'))
-      .map((name) => name.replace('EVOLUTION_API_KEY_', '').replace(/_/g, ' '));
-    const names = EVOLUTION_INSTANCES.length ? EVOLUTION_INSTANCES : [...Object.keys(EVOLUTION_API_KEYS), ...envInstances];
-    res.json(names.map((name) => ({ name, connectionStatus: 'open' })));
+    const instances = await getConfiguredInstances();
+    res.json(instances.filter((instance) => canAccessInstance(req.user, instance.name)));
   } catch (error) {
     res.status(error.status || 500).json({ message: error.message, details: error.body || null });
   }
 });
 
-app.get('/api/leads', async (_req, res) => {
+app.get('/api/leads', requireAuth, async (req, res) => {
   try {
-    const { instances, leads } = await syncFromEvolution();
+    const { instances, leads } = await syncFromEvolution(req.user);
     res.json({ instances, leads: leads.sort((a, b) => b.lastTs - a.lastTs) });
   } catch (error) {
     res.status(error.status || 500).json({ message: error.message, details: error.body || null });
   }
 });
 
-app.patch('/api/leads/:id', (req, res) => {
+app.patch('/api/leads/:id', requireAuth, (req, res) => {
   const id = decodeURIComponent(req.params.id);
+  const { instance } = splitLeadKey(id);
+  if (!canAccessInstance(req.user, instance)) return res.status(403).json({ message: 'Sem acesso a este cliente' });
+
   const db = readDb();
   if (!db.leads[id]) return res.status(404).json({ message: 'Lead nao encontrado' });
 
@@ -279,20 +515,27 @@ app.patch('/api/leads/:id', (req, res) => {
   res.json(db.leads[id]);
 });
 
-app.get('/api/leads/:id/messages', async (req, res) => {
+app.get('/api/leads/:id/messages', requireAuth, async (req, res) => {
   const id = decodeURIComponent(req.params.id);
   const { instance, jid } = splitLeadKey(id);
+  if (!canAccessInstance(req.user, instance)) return res.status(403).json({ message: 'Sem acesso a esta conversa' });
+
   const db = readDb();
   const offset = Math.min(Math.max(Number(req.query.offset) || 80, 1), 200);
-  const page = Math.max(Number(req.query.page) || 1, 1);
+  const pages = Math.min(Math.max(Number(req.query.pages) || 5, 1), 10);
 
   try {
-    const response = await evolution(`/chat/findMessages/${encodeURIComponent(instance)}`, {
-      method: 'POST',
-      body: JSON.stringify({ where: { key: { remoteJid: jid } }, offset, page }),
-    }, instance);
-    const records = response?.messages?.records || response?.records || response?.messages || [];
-    for (const message of records) appendMessage(db, instance, jid, message);
+    for (let page = 1; page <= pages; page += 1) {
+      const response = await evolution(`/chat/findMessages/${encodeURIComponent(instance)}`, {
+        method: 'POST',
+        body: JSON.stringify({ where: { key: { remoteJid: jid } }, offset, page }),
+      }, instance);
+      const records = response?.messages?.records || response?.records || response?.messages || [];
+      if (!records.length) break;
+      for (const message of records) appendMessage(db, instance, jid, message);
+      const totalPages = response?.messages?.pages || response?.pages || pages;
+      if (page >= totalPages) break;
+    }
     writeDb(db);
   } catch (error) {
     console.warn(`Nao foi possivel buscar mensagens de ${id}:`, error.message);

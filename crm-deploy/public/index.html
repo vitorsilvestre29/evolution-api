@@ -10,6 +10,7 @@
   .topbar { background: #1a1d2e; border-bottom: 1px solid #2a2d3e; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
   .topbar h1 { font-size: 20px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px; }
   .topbar-right { display: flex; gap: 12px; align-items: center; }
+  .user-chip { color: #d1d5db; font-size: 12px; border: 1px solid #2a2d3e; border-radius: 20px; padding: 6px 10px; }
   .btn { padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .2s; }
   .btn-primary { background: #4f46e5; color: #fff; }
   .btn-primary:hover { background: #4338ca; }
@@ -28,6 +29,26 @@
   .sidebar-item .dot.off { background: #6b7280; }
   .sidebar-count { margin-left: auto; background: #2a2d3e; padding: 1px 7px; border-radius: 10px; font-size: 11px; }
   .main { flex: 1; overflow-y: auto; padding: 24px 28px; }
+  .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #0f1117; }
+  .login-card { width: min(420px, 100%); background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 8px; padding: 28px; }
+  .login-card h1 { font-size: 24px; margin-bottom: 6px; }
+  .login-card p { color: #9ca3af; font-size: 13px; margin-bottom: 22px; }
+  .login-card label { display: block; color: #9ca3af; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin: 14px 0 6px; }
+  .login-card input { width: 100%; background: #141624; border: 1px solid #2a2d3e; border-radius: 8px; padding: 11px 12px; color: #fff; outline: none; }
+  .login-error { color: #f87171; min-height: 18px; font-size: 12px; margin-top: 10px; }
+  .admin-panel { display: none; margin-bottom: 18px; background: #1a1d2e; border: 1px solid #2a2d3e; border-radius: 8px; padding: 16px; }
+  .admin-panel h2 { font-size: 14px; margin-bottom: 12px; color: #fff; }
+  .admin-form { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)) auto; gap: 10px; align-items: end; margin-bottom: 14px; }
+  .admin-form label { display: block; color: #6b7280; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
+  .admin-form input, .admin-form select { width: 100%; background: #141624; border: 1px solid #2a2d3e; border-radius: 8px; padding: 9px 10px; color: #fff; outline: none; }
+  .admin-form select { min-height: 38px; }
+  .admin-form .actions { display: flex; gap: 8px; }
+  .client-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .client-card { border: 1px solid #2a2d3e; border-radius: 8px; padding: 12px; background: #141624; }
+  .client-card strong { display: block; font-size: 13px; color: #fff; margin-bottom: 4px; }
+  .client-card span { display: block; font-size: 12px; color: #9ca3af; }
+  .client-card .card-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .client-card .source { color: #fbbf24; }
   .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
   .stat-card { background: #1a1d2e; border-radius: 8px; padding: 20px; border: 1px solid #2a2d3e; }
   .stat-card .label { font-size: 12px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
@@ -91,15 +112,31 @@
     .modal-body { grid-template-columns: 1fr; overflow-y: auto; }
     .lead-panel { border-right: 0; border-bottom: 1px solid #2a2d3e; }
     .chat-panel { min-height: 460px; }
+    .admin-form { grid-template-columns: 1fr; }
   }
 </style>
 </head>
 <body>
+<div class="login-wrap" id="login-screen">
+  <form class="login-card" onsubmit="login(event)">
+    <h1>Evolution CRM</h1>
+    <p>Acesse sua area para acompanhar clientes, conversas e fechamento.</p>
+    <label>Usuario</label>
+    <input id="login-user" autocomplete="username" required />
+    <label>Senha</label>
+    <input id="login-pass" type="password" autocomplete="current-password" required />
+    <div class="login-error" id="login-error"></div>
+    <button class="btn btn-primary" type="submit" style="width:100%;margin-top:10px;">Entrar</button>
+  </form>
+</div>
+<div id="app-shell" style="display:none;">
 <div class="topbar">
   <h1><span>CRM</span> Evolution CRM</h1>
   <div class="topbar-right">
+    <span class="user-chip" id="user-chip"></span>
     <span id="api-status" class="badge-status badge-offline">Verificando</span>
     <button class="btn btn-primary" onclick="loadLeads()">Atualizar</button>
+    <button class="btn btn-ghost" onclick="logout()">Sair</button>
   </div>
 </div>
 <div class="layout">
@@ -117,6 +154,33 @@
     <div class="sidebar-item" onclick="filterStatus('Perdido', this)"><span>Perdidos</span><span class="sidebar-count" id="count-Perdido">0</span></div>
   </div>
   <div class="main">
+    <div class="admin-panel" id="admin-panel">
+      <h2>Acessos dos clientes</h2>
+      <form class="admin-form" onsubmit="saveClientUser(event)">
+        <input type="hidden" id="admin-user-id" />
+        <div>
+          <label>Nome</label>
+          <input id="admin-user-name" placeholder="Ex: Dr William" required />
+        </div>
+        <div>
+          <label>Usuario</label>
+          <input id="admin-user-username" placeholder="drwilliam" required />
+        </div>
+        <div>
+          <label>Senha</label>
+          <input id="admin-user-password" type="password" placeholder="Nova senha" />
+        </div>
+        <div>
+          <label>Instancias</label>
+          <select id="admin-user-instances" multiple></select>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" type="submit">Salvar</button>
+          <button class="btn btn-ghost" type="button" onclick="resetUserForm()">Novo</button>
+        </div>
+      </form>
+      <div class="client-grid" id="client-grid"></div>
+    </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="label">Total de Leads</div><div class="value c-total" id="stat-total">0</div><div class="sub">todos os bots</div></div>
       <div class="stat-card"><div class="label">Novos</div><div class="value c-new" id="stat-new">0</div><div class="sub">aguardando atendimento</div></div>
@@ -179,13 +243,36 @@
     </div>
   </div>
 </div>
+</div>
 <script>
-let allLeads = [], instances = [], activeInstanceFilter = 'all', activeStatusFilter = '', currentLead = null;
+let allLeads = [], instances = [], clients = [], currentUser = null, activeInstanceFilter = 'all', activeStatusFilter = '', currentLead = null;
 
 async function apiGet(path) {
   const response = await fetch(path);
   const data = await response.json();
+  if (response.status === 401) {
+    showLogin();
+    throw new Error('Login necessario');
+  }
   if (!response.ok) throw new Error(data.message || 'Erro na API do CRM');
+  return data;
+}
+
+async function apiPost(path, body = {}) {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Erro na API do CRM');
+  return data;
+}
+
+async function apiDelete(path) {
+  const response = await fetch(path, { method: 'DELETE' });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Erro ao remover');
   return data;
 }
 
@@ -196,6 +283,10 @@ async function apiPatch(path, body) {
     body: JSON.stringify(body)
   });
   const data = await response.json();
+  if (response.status === 401) {
+    showLogin();
+    throw new Error('Login necessario');
+  }
   if (!response.ok) throw new Error(data.message || 'Erro ao salvar lead');
   return data;
 }
@@ -206,13 +297,152 @@ function escapeHtml(value) {
 
 async function init() {
   try {
+    const me = await apiGet('/api/me');
+    currentUser = me.user;
+    clients = me.clients || [];
+    showApp();
     await loadLeads();
     document.getElementById('api-status').textContent = 'Online';
     document.getElementById('api-status').className = 'badge-status badge-online';
   } catch(e) {
+    if (String(e.message).includes('Login')) return;
     document.getElementById('api-status').textContent = 'Offline';
     document.getElementById('api-status').className = 'badge-status badge-offline';
     document.getElementById('leads-tbody').innerHTML = `<tr class="loading-row"><td colspan="6" style="color:#f87171;">Erro ao conectar. Verifique EVOLUTION_API_URL e EVOLUTION_API_KEY no Railway.</td></tr>`;
+  }
+}
+
+function showLogin() {
+  document.getElementById('login-screen').style.display = 'grid';
+  document.getElementById('app-shell').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'block';
+  document.getElementById('user-chip').textContent = `${currentUser.name || currentUser.username} - ${currentUser.role === 'admin' ? 'Admin' : 'Cliente'}`;
+  renderAdminPanel();
+}
+
+async function login(event) {
+  event.preventDefault();
+  document.getElementById('login-error').textContent = '';
+  try {
+    const result = await apiPost('/api/login', {
+      username: document.getElementById('login-user').value.trim(),
+      password: document.getElementById('login-pass').value
+    });
+    currentUser = result.user;
+    const me = await apiGet('/api/me');
+    clients = me.clients || [];
+    showApp();
+    await loadLeads();
+  } catch (error) {
+    document.getElementById('login-error').textContent = error.message || 'Nao foi possivel entrar';
+  }
+}
+
+async function logout() {
+  try { await apiPost('/api/logout'); } catch (_e) {}
+  currentUser = null; allLeads = []; instances = []; clients = [];
+  showLogin();
+}
+
+function renderAdminPanel() {
+  const panel = document.getElementById('admin-panel');
+  const grid = document.getElementById('client-grid');
+  if (!currentUser || currentUser.role !== 'admin') {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = 'block';
+  renderInstancePicker();
+  if (!clients.length) {
+    grid.innerHTML = '<div class="time-text">Nenhum cliente criado ainda.</div>';
+    return;
+  }
+  grid.innerHTML = clients.map(client => `
+    <div class="client-card">
+      <strong>${escapeHtml(client.name)}</strong>
+      <span>${escapeHtml(client.username)}</span>
+      <span>${escapeHtml((client.instances || []).join(', ') || 'Sem instancias')}</span>
+      ${client.source === 'env' ? '<span class="source">Criado por variable</span>' : ''}
+      <div class="card-actions">
+        <button class="btn btn-ghost" type="button" onclick="editClientUser('${escapeHtml(client.id)}')" ${client.source === 'env' ? 'disabled' : ''}>Editar</button>
+        <button class="btn btn-ghost" type="button" onclick="deleteClientUser('${escapeHtml(client.id)}')" ${client.source === 'env' ? 'disabled' : ''}>Remover</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderInstancePicker(selected = []) {
+  const select = document.getElementById('admin-user-instances');
+  if (!select) return;
+  select.innerHTML = instances.map(instance => {
+    const name = instance.name;
+    return `<option value="${escapeHtml(name)}" ${selected.includes(name) ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+  }).join('');
+}
+
+function resetUserForm() {
+  document.getElementById('admin-user-id').value = '';
+  document.getElementById('admin-user-name').value = '';
+  document.getElementById('admin-user-username').value = '';
+  document.getElementById('admin-user-password').value = '';
+  renderInstancePicker();
+}
+
+function editClientUser(id) {
+  const user = clients.find(client => client.id === id);
+  if (!user || user.source === 'env') return;
+  document.getElementById('admin-user-id').value = user.id;
+  document.getElementById('admin-user-name').value = user.name || '';
+  document.getElementById('admin-user-username').value = user.username || '';
+  document.getElementById('admin-user-password').value = '';
+  renderInstancePicker(user.instances || []);
+}
+
+async function refreshClientUsers() {
+  if (!currentUser || currentUser.role !== 'admin') return;
+  const data = await apiGet('/api/users');
+  clients = data.users || [];
+  renderAdminPanel();
+}
+
+async function saveClientUser(event) {
+  event.preventDefault();
+  const id = document.getElementById('admin-user-id').value;
+  const selectedInstances = Array.from(document.getElementById('admin-user-instances').selectedOptions).map(option => option.value);
+  const body = {
+    name: document.getElementById('admin-user-name').value.trim(),
+    username: document.getElementById('admin-user-username').value.trim(),
+    password: document.getElementById('admin-user-password').value,
+    instances: selectedInstances
+  };
+  if (!id && !body.password) {
+    alert('Informe uma senha para criar o usuario.');
+    return;
+  }
+  if (id && !body.password) delete body.password;
+
+  try {
+    if (id) await apiPatch(`/api/users/${encodeURIComponent(id)}`, body);
+    else await apiPost('/api/users', body);
+    resetUserForm();
+    await refreshClientUsers();
+  } catch (error) {
+    alert(error.message || 'Nao foi possivel salvar o usuario.');
+  }
+}
+
+async function deleteClientUser(id) {
+  if (!confirm('Remover este acesso?')) return;
+  try {
+    await apiDelete(`/api/users/${encodeURIComponent(id)}`);
+    resetUserForm();
+    await refreshClientUsers();
+  } catch (error) {
+    alert(error.message || 'Nao foi possivel remover o usuario.');
   }
 }
 
@@ -234,6 +464,7 @@ async function loadLeads() {
   instances = Array.isArray(data.instances) ? data.instances : [];
   allLeads = Array.isArray(data.leads) ? data.leads : [];
   renderInstances();
+  renderAdminPanel();
   updateStats(); updateCounts(); renderTable();
 }
 
@@ -337,7 +568,7 @@ async function refreshConversation() {
   document.getElementById('modal-msgs').innerHTML = '<div style="color:#6b7280;font-size:12px;text-align:center;padding:12px;"><div class="spinner"></div></div>';
   document.getElementById('modal-chat-subtitle').textContent = 'Buscando mensagens...';
   try {
-    const list = await apiGet(`/api/leads/${encodeURIComponent(currentLead.id)}/messages?offset=100`);
+    const list = await apiGet(`/api/leads/${encodeURIComponent(currentLead.id)}/messages?offset=200&pages=10`);
     document.getElementById('modal-chat-subtitle').textContent = `${list.length} mensagens carregadas`;
     if (!list.length) {
       document.getElementById('modal-msgs').innerHTML = '<div style="color:#6b7280;font-size:12px;text-align:center;padding:12px;">Sem mensagens encontradas para este contato.</div>';
