@@ -186,7 +186,10 @@ async function syncFromEvolution() {
 
   for (const instance of instances) {
     try {
-      const chatsResponse = await evolution(`/chat/findChats/${encodeURIComponent(instance.name)}`, {}, instance.name);
+      const chatsResponse = await evolution(`/chat/findChats/${encodeURIComponent(instance.name)}`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      }, instance.name);
       const chats = Array.isArray(chatsResponse) ? chatsResponse : chatsResponse?.chats || [];
 
       for (const chat of chats) {
