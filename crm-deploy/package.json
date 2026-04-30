@@ -1,7 +1,7 @@
 {
-  "name": "evolution-crm",
+  "name": "juridico-atende-crm",
   "version": "1.0.0",
-  "description": "CRM para Evolution API",
+  "description": "CRM juridico para WhatsApp, chatbots e trafego pago",
   "engines": {
     "node": ">=18"
   },
