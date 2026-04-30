@@ -132,6 +132,8 @@
   thead th { background: var(--surface-2); padding: 13px 16px; text-align: left; font-size: 10px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0; border-bottom: 1px solid var(--line); }
   tbody tr { border-bottom: 1px solid var(--line-soft); cursor: pointer; transition: background .15s; }
   tbody tr:hover { background: #fbf8ef; }
+  tbody tr.overdue { background: rgba(185, 138, 54, .08); }
+  tbody tr.overdue:hover { background: rgba(185, 138, 54, .14); }
   tbody tr:last-child { border-bottom: none; }
   td { padding: 14px 16px; font-size: 13px; vertical-align: middle; }
   .lead-cell { display:flex; gap:12px; align-items:center; min-width: 210px; }
@@ -165,6 +167,9 @@
   .chat-toolbar { min-height: 64px; padding: 12px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--surface); }
   .chat-title { font-size: 12px; color: var(--muted); font-weight: 800; text-transform: uppercase; letter-spacing: 0; }
   .composer { border-top: 1px solid var(--line); padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; background: var(--surface); flex-shrink: 0; }
+  .template-bar { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+  .template-btn { min-height: 30px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); cursor: pointer; font-size: 11px; font-weight: 750; font-family: inherit; }
+  .template-btn:hover { background: var(--surface-3); }
   .composer textarea { width: 100%; min-height: 46px; max-height: 120px; resize: vertical; padding: 11px 12px; line-height: 1.35; font-size: 13px; }
   .composer-status { grid-column: 1 / -1; min-height: 16px; color: var(--muted-2); font-size: 11px; }
   .composer-status.error { color: #fca5a5; }
@@ -321,7 +326,14 @@
       <select class="filter-select" onchange="renderTable()" id="filter-inst-sel">
         <option value="">Todos os WhatsApps</option>
       </select>
+      <select class="filter-select" onchange="renderTable()" id="sort-sel">
+        <option value="recent">Mais recentes</option>
+        <option value="oldest">Mais antigos</option>
+        <option value="followup">Proximo retorno</option>
+        <option value="value">Maior valor</option>
+      </select>
       <button class="btn btn-ghost" type="button" onclick="clearFilters()">Limpar</button>
+      <button class="btn btn-primary" type="button" onclick="exportCsv()">Exportar CSV</button>
     </div>
     <div class="table-wrap">
       <table>
@@ -375,6 +387,7 @@
         </div>
         <div class="msgs-list" id="modal-msgs"></div>
         <form class="composer" onsubmit="sendMessage(event)">
+          <div class="template-bar" id="reply-templates"></div>
           <textarea id="composer-text" placeholder="Responder pelo WhatsApp..." onkeydown="handleComposerKeydown(event)"></textarea>
           <button class="btn btn-primary" type="submit">Enviar</button>
           <div class="composer-status" id="composer-status"></div>
@@ -385,7 +398,25 @@
 </div>
 </div>
 <script>
-let allLeads = [], instances = [], clients = [], currentMetrics = null, currentUser = null, activeInstanceFilter = 'all', activeStatusFilter = '', currentLead = null;
+let allLeads = [], instances = [], clients = [], currentMetrics = null, currentUser = null, activeInstanceFilter = 'all', activeStatusFilter = '', currentLead = null, currentTableLeads = [];
+const replyTemplates = [
+  {
+    label: 'Agendar consulta',
+    text: 'Ola, tudo bem? Podemos agendar uma consulta para entender melhor o seu caso. Qual melhor horario para voce?'
+  },
+  {
+    label: 'Pedir documentos',
+    text: 'Para avaliarmos com mais seguranca, pode enviar os documentos principais e um breve resumo do ocorrido?'
+  },
+  {
+    label: 'Retorno humano',
+    text: 'Recebemos sua mensagem. Um especialista do escritorio vai analisar e te retornar por aqui em breve.'
+  },
+  {
+    label: 'Follow-up',
+    text: 'Passando para saber se voce conseguiu verificar as informacoes que combinamos. Posso te ajudar com algo agora?'
+  }
+];
 
 async function apiGet(path) {
   const response = await fetch(path);
@@ -443,6 +474,17 @@ function formatDateTime(value) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return '-';
   return date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function isLeadOverdue(lead) {
+  if (!lead.followUpAt || ['Fechado', 'Perdido'].includes(lead.status || 'Novo')) return false;
+  const date = new Date(lead.followUpAt);
+  return !Number.isNaN(date.getTime()) && date.getTime() < Date.now();
+}
+
+function csvCell(value) {
+  const text = String(value ?? '').replace(/\r?\n/g, ' ').trim();
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 async function init() {
@@ -544,6 +586,23 @@ function resetUserForm() {
   document.getElementById('admin-user-username').value = '';
   document.getElementById('admin-user-password').value = '';
   renderInstancePicker();
+}
+
+function renderReplyTemplates() {
+  const wrap = document.getElementById('reply-templates');
+  if (!wrap) return;
+  wrap.innerHTML = replyTemplates.map((template, index) => (
+    `<button class="template-btn" type="button" onclick="applyReplyTemplate(${index})">${escapeHtml(template.label)}</button>`
+  )).join('');
+}
+
+function applyReplyTemplate(index) {
+  const textarea = document.getElementById('composer-text');
+  const template = replyTemplates[index];
+  if (!textarea || !template) return;
+  const prefix = textarea.value.trim() ? `${textarea.value.trim()}\n\n` : '';
+  textarea.value = `${prefix}${template.text}`;
+  textarea.focus();
 }
 
 function editClientUser(id) {
@@ -717,6 +776,36 @@ function renderInsights() {
   });
 }
 
+function getFilteredLeads() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const statusSel = document.getElementById('filter-status-sel').value;
+  const areaSel = document.getElementById('filter-area-sel').value;
+  const instSel = document.getElementById('filter-inst-sel').value;
+  const sortSel = document.getElementById('sort-sel').value;
+  const filtered = allLeads.filter(l => {
+    const st = l.status||'Novo';
+    const searchable = [l.name, l.phone, l.lastMsg, l.area, l.source, l.campaign, l.notes, l.instance].map(value => String(value || '').toLowerCase()).join(' ');
+    if (search && !searchable.includes(search)) return false;
+    if (statusSel && st !== statusSel) return false;
+    if (areaSel && l.area !== areaSel) return false;
+    if (instSel && l.instance !== instSel) return false;
+    if (activeInstanceFilter !== 'all' && l.instance !== activeInstanceFilter) return false;
+    if (activeStatusFilter && st !== activeStatusFilter) return false;
+    return true;
+  });
+
+  return filtered.sort((a, b) => {
+    if (sortSel === 'oldest') return (a.lastTs || 0) - (b.lastTs || 0);
+    if (sortSel === 'followup') {
+      const aTime = a.followUpAt ? new Date(a.followUpAt).getTime() : Number.MAX_SAFE_INTEGER;
+      const bTime = b.followUpAt ? new Date(b.followUpAt).getTime() : Number.MAX_SAFE_INTEGER;
+      return aTime - bTime;
+    }
+    if (sortSel === 'value') return (Number(b.valor || 0) || 0) - (Number(a.valor || 0) || 0);
+    return (b.lastTs || 0) - (a.lastTs || 0);
+  });
+}
+
 function updateCounts() {
   document.getElementById('count-all').textContent = allLeads.length;
   ['Novo','Em andamento','Agendado','Fechado','Perdido'].forEach(s => {
@@ -730,21 +819,8 @@ function updateCounts() {
 }
 
 function renderTable() {
-  const search = document.getElementById('search-input').value.toLowerCase();
-  const statusSel = document.getElementById('filter-status-sel').value;
-  const areaSel = document.getElementById('filter-area-sel').value;
-  const instSel   = document.getElementById('filter-inst-sel').value;
-  let filtered = allLeads.filter(l => {
-    const st = l.status||'Novo';
-    const searchable = [l.name, l.phone, l.lastMsg, l.area, l.source, l.campaign, l.notes, l.instance].map(value => String(value || '').toLowerCase()).join(' ');
-    if (search && !searchable.includes(search)) return false;
-    if (statusSel && st !== statusSel) return false;
-    if (areaSel && l.area !== areaSel) return false;
-    if (instSel && l.instance !== instSel) return false;
-    if (activeInstanceFilter !== 'all' && l.instance !== activeInstanceFilter) return false;
-    if (activeStatusFilter && st !== activeStatusFilter) return false;
-    return true;
-  });
+  const filtered = getFilteredLeads();
+  currentTableLeads = filtered;
   const tbody = document.getElementById('leads-tbody');
   if (!filtered.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="icon">0</div><p>Nenhuma oportunidade encontrada</p></div></td></tr>`; return; }
   const pillMap = {'Novo':'pill-novo','Em andamento':'pill-andamento','Agendado':'pill-agendado','Fechado':'pill-fechado','Perdido':'pill-perdido'};
@@ -754,15 +830,46 @@ function renderTable() {
     const ts = l.lastTs ? new Date(l.lastTs*1000).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
     const botState = l.lastFromMe ? 'Resposta enviada' : 'Aguardando atendimento';
     const botClass = l.lastFromMe ? 'pill-bot' : 'pill-waiting';
-    return `<tr onclick="openLead('${encodeURIComponent(l.id)}')">
+    const overdue = isLeadOverdue(l);
+    const overdueTag = overdue ? '<br><span class="pill pill-andamento">Retorno atrasado</span>' : '';
+    return `<tr class="${overdue ? 'overdue' : ''}" onclick="openLead('${encodeURIComponent(l.id)}')">
       <td><div class="lead-cell"><div class="avatar">${l.profilePic?`<img src="${escapeHtml(l.profilePic)}" onerror="this.style.display='none'"/>`:''}${escapeHtml(initials)}</div><div><div class="lead-name">${escapeHtml(l.name)}</div><div class="lead-phone">+${escapeHtml(l.phone)}</div></div></div></td>
       <td><span class="pill pill-bot">${escapeHtml(l.instance)}</span></td>
       <td><select class="pill status-select ${pillMap[status]||'pill-novo'}" onchange="quickStatus('${encodeURIComponent(l.id)}',this.value,event)" onclick="event.stopPropagation()">${['Novo','Em andamento','Agendado','Fechado','Perdido'].map(s=>`<option value="${s}"${s===status?' selected':''}>${s}</option>`).join('')}</select></td>
-      <td><div class="msg-preview">${escapeHtml((l.lastMsg||'').slice(0,60))}<br><span class="pill ${botClass}">${botState}</span></div></td>
+      <td><div class="msg-preview">${escapeHtml((l.lastMsg||'').slice(0,60))}<br><span class="pill ${botClass}">${botState}</span>${overdueTag}</div></td>
       <td><div class="time-text">${ts}</div></td>
       <td><button class="btn btn-ghost row-action" onclick="openLead('${encodeURIComponent(l.id)}');event.stopPropagation()">Ver</button></td>
     </tr>`;
   }).join('');
+}
+
+function exportCsv() {
+  const rows = currentTableLeads.length ? currentTableLeads : getFilteredLeads();
+  const header = ['Nome','Telefone','WhatsApp','Status','Area','Origem','Campanha','Proximo retorno','Honorarios','Ultima mensagem','Quando','Anotacoes'];
+  const body = rows.map(lead => [
+    lead.name,
+    lead.phone,
+    lead.instance,
+    lead.status || 'Novo',
+    lead.area,
+    lead.source,
+    lead.campaign,
+    lead.followUpAt ? formatDateTime(lead.followUpAt) : '',
+    lead.valor,
+    lead.lastMsg,
+    lead.lastTs ? formatDateTime(new Date(lead.lastTs * 1000)) : '',
+    lead.notes
+  ].map(csvCell).join(','));
+  const csv = [header.map(csvCell).join(','), ...body].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `juridico-atende-contatos-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function clearFilters() {
@@ -772,6 +879,7 @@ function clearFilters() {
   document.getElementById('filter-status-sel').value = '';
   document.getElementById('filter-area-sel').value = '';
   document.getElementById('filter-inst-sel').value = '';
+  document.getElementById('sort-sel').value = 'recent';
   document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
   document.querySelector('.sidebar .sidebar-item')?.classList.add('active');
   renderTable();
@@ -921,6 +1029,7 @@ function handleComposerKeydown(event) {
 
 function closeModal() { document.getElementById('modal').style.display='none'; currentLead=null; renderTable(); }
 function openWhatsApp() { if (currentLead) window.open(`https://wa.me/${currentLead.phone}`,'_blank'); }
+renderReplyTemplates();
 init();
 </script>
 </body>
