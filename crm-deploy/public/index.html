@@ -636,6 +636,7 @@
           <button class="action-chip gold" onclick="sendNps()" title="Enviar pesquisa NPS">⭐ NPS</button>
           <button class="action-chip" id="cal-btn" onclick="openGoogleCalendar()" title="Criar evento no calendário">📅 Agenda</button>
           <button class="action-chip" onclick="exportLeadData()" title="Exportar dados (LGPD)">⬇ LGPD</button>
+          <button class="action-chip danger" id="reset-msgs-btn" onclick="resetMessages()" style="display:none;" title="Limpar histórico e recarregar">↺ Reset msgs</button>
           <button class="action-chip danger" id="perm-delete-btn" onclick="permanentDelete()" style="display:none;" title="Exclusão definitiva">🗑 Excluir tudo</button>
         </div>
         <div class="chat-toolbar">
@@ -1288,6 +1289,7 @@ async function openLead(encodedId) {
   document.getElementById('modal-assigned').value = currentLead.assignedTo || '';
   document.getElementById('modal-valor-pago').value = currentLead.valorPago || '';
   document.getElementById('perm-delete-btn').style.display = currentUser?.role === 'admin' ? '' : 'none';
+  document.getElementById('reset-msgs-btn').style.display = currentUser?.role === 'admin' ? '' : 'none';
   document.getElementById('composer-text').value = '';
   document.getElementById('composer-status').textContent = '';
   document.getElementById('composer-status').className = 'composer-status';
@@ -1812,6 +1814,21 @@ async function exportLeadData() {
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(a.href);
     toast('Dados exportados (LGPD)', 'success');
+  } catch (e) { toast('Erro: ' + e.message, 'error'); }
+}
+
+async function resetMessages() {
+  if (!currentLead) return;
+  const ok = await showConfirm(
+    'Limpar histórico de mensagens',
+    'Isso apaga o histórico salvo localmente e recarrega do Evolution API. Use quando as mensagens estiverem exibindo na direção errada.',
+    'Limpar e recarregar',
+  );
+  if (!ok) return;
+  try {
+    await apiDelete(`/api/leads/${encodeURIComponent(currentLead.id)}/messages/reset`);
+    toast('Histórico limpo. Recarregando...', 'info', 3000);
+    await refreshConversation();
   } catch (e) { toast('Erro: ' + e.message, 'error'); }
 }
 

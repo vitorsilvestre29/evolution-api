@@ -453,14 +453,13 @@ function appendMessage(db, instance, jid, rawMessage) {
   db.messages[key] = db.messages[key] || [];
   const existing = db.messages[key].find((m) => m.id === msgId);
   if (existing) {
-    // Fill in any missing fields from this delivery
+    // Fill in missing fields only — never overwrite fromMe after first storage.
+    // findMessages can return wrong fromMe values; the first write (webhook) is authoritative.
     if (!existing.text) existing.text = text;
     if (!existing.type || existing.type === 'unknown') existing.type = type;
     if (!existing.title || existing.title === 'Mensagem') existing.title = title;
     if (!existing.fileName) existing.fileName = fileName || '';
     if (!existing.seconds) existing.seconds = seconds || null;
-    // Correct fromMe if it was stored wrong (e.g. from a stale entry)
-    if (id) existing.fromMe = fromMe;
   } else {
     db.messages[key].push({ id: msgId, text, fromMe, ts, type, title, fileName: fileName || '', seconds: seconds || null });
     db.messages[key] = db.messages[key].sort((a, b) => a.ts - b.ts).slice(-5000);
@@ -810,6 +809,21 @@ app.get('/api/instances', requireAuth, async (req, res) => {
   } catch (e) {
     res.status(e.status || 500).json({ message: e.message, details: e.body || null });
   }
+});
+
+// ─── Routes: Reset messages (limpa mensagens corrompidas de um lead) ──────────
+app.delete('/api/leads/:id/messages/reset', requireAuth, requireAdmin, async (req, res) => {
+  const id = decodeURIComponent(req.params.id);
+  const { instance } = splitLeadKey(id);
+  if (!canAccessInstance(req.user, instance)) return res.status(403).json({ message: 'Sem acesso' });
+  await withDbLock(async () => {
+    const db = await readDb();
+    if (!db.leads[id]) return res.status(404).json({ message: 'Lead nao encontrado' });
+    db.messages[id] = [];
+    clearSyncCache(instance);
+    await writeDb(db);
+    res.json({ ok: true });
+  });
 });
 
 // ─── Routes: Health ───────────────────────────────────────────────────────────
