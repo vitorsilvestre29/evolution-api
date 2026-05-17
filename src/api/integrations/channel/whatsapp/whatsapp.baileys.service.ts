@@ -2829,7 +2829,8 @@ export class BaileysStartupService extends ChannelStartupService {
 
           const response = await axios.get(mediaMessage.media, config);
 
-          mimetype = response.headers['content-type'];
+          const contentType = response.headers['content-type'];
+          mimetype = typeof contentType === 'string' ? contentType : false;
         }
       }
 

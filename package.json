@@ -12,7 +12,6 @@
     "test": "tsx watch ./test/all.test.ts",
     "lint": "eslint --fix --ext .ts src",
     "lint:check": "eslint --ext .ts src",
-    "commit": "cz",
     "commitlint": "commitlint --edit",
     "db:generate": "node runWithProvider.js \"npx prisma generate --schema ./prisma/DATABASE_PROVIDER-schema.prisma\"",
     "db:deploy": "node runWithProvider.js \"rm -rf ./prisma/migrations && cp -r ./prisma/DATABASE_PROVIDER-migrations ./prisma/migrations && npx prisma migrate deploy --schema ./prisma/DATABASE_PROVIDER-schema.prisma\"",
@@ -59,16 +58,11 @@
       "sh -c 'tsc --noEmit'"
     ]
   },
-  "config": {
-    "commitizen": {
-      "path": "cz-conventional-changelog"
-    }
-  },
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
     "@aws-sdk/client-sqs": "^3.891.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "@figuro/chatwoot-sdk": "^1.1.16",
+    "@figuro/chatwoot-sdk": "1.1.17",
     "@hapi/boom": "^10.0.1",
     "@paralleldrive/cuid2": "^2.2.2",
     "@prisma/client": "^6.16.2",
@@ -77,7 +71,7 @@
     "amqplib": "^0.10.5",
     "audio-decode": "^2.2.3",
     "axios": "^1.7.9",
-    "baileys": "7.0.0-rc.9",
+    "baileys": "7.0.0-rc11",
     "class-validator": "^0.14.1",
     "compression": "^1.7.5",
     "cors": "^2.8.5",
@@ -98,7 +92,6 @@
     "jsonwebtoken": "^9.0.2",
     "kafkajs": "^2.2.4",
     "libphonenumber-js": "^1.12.25",
-    "link-preview-js": "^3.0.13",
     "long": "^5.2.3",
     "mediainfo.js": "^0.3.4",
     "mime": "^4.0.0",
@@ -141,8 +134,6 @@
     "@types/qrcode-terminal": "^0.12.2",
     "@typescript-eslint/eslint-plugin": "^8.44.0",
     "@typescript-eslint/parser": "^8.44.0",
-    "commitizen": "^4.3.1",
-    "cz-conventional-changelog": "^3.3.0",
     "eslint": "^8.45.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.31.0",
@@ -154,5 +145,12 @@
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.20.5",
     "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "@figuro/chatwoot-sdk@1.1.17": {
+      "axios": "$axios"
+    },
+    "brace-expansion": "^2.0.3",
+    "lodash": "^4.18.1"
   }
 }

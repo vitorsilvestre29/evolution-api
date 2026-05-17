@@ -30,6 +30,8 @@ RUN ./Docker/scripts/generate_database.sh
 
 RUN npm run build
 
+RUN npm prune --omit=dev --silent
+
 FROM node:24-alpine AS final
 
 RUN apk update && \

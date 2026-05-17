@@ -1204,7 +1204,8 @@ export class ChatwootService {
         const response = await axios.get(media, {
           responseType: 'arraybuffer',
         });
-        mimeType = response.headers['content-type'];
+        const contentType = response.headers['content-type'];
+        mimeType = typeof contentType === 'string' ? contentType : '';
       }
 
       let type = 'document';
@@ -2214,7 +2215,8 @@ export class ChatwootService {
         if (isAdsMessage) {
           const imgBuffer = await axios.get(adsMessage.thumbnailUrl, { responseType: 'arraybuffer' });
 
-          const extension = mimeTypes.extension(imgBuffer.headers['content-type']);
+          const contentType = imgBuffer.headers['content-type'];
+          const extension = typeof contentType === 'string' ? mimeTypes.extension(contentType) : false;
           const mimeType = extension && mimeTypes.lookup(extension);
 
           if (!mimeType) {
