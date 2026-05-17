@@ -797,9 +797,11 @@ export abstract class BaseChatbotController<BotType = any, BotData extends BaseC
 
       if (this.checkIgnoreJids(settings?.ignoreJids, remoteJid)) return;
 
-      const session = await this.getSession(remoteJid, instance);
+      let session = await this.getSession(remoteJid, instance);
 
       const content = getConversationMessage(msg);
+
+      session = await this.closeExpiredSession(instance, remoteJid, session, settings);
 
       // Get integration type
       // const integrationType = this.getIntegrationType();
@@ -946,5 +948,52 @@ export abstract class BaseChatbotController<BotType = any, BotData extends BaseC
     } catch (error) {
       this.logger.error(error);
     }
+  }
+
+  private async closeExpiredSession(instance: InstanceDto, remoteJid: string, session: any, settings: any) {
+    if (!session || session.status === 'paused' || !session.botId) return session;
+
+    const bot = await this.botRepository.findFirst({
+      where: {
+        id: session.botId,
+        instanceId: instance.instanceId,
+      },
+    });
+
+    if (!bot) return session;
+
+    const expire = bot.expire ?? settings?.expire;
+    if (!expire || expire <= 0) return session;
+
+    const sessionUpdatedAt = new Date(session.updatedAt).getTime();
+    const isExpired = Date.now() - sessionUpdatedAt > expire * 60 * 1000;
+    if (!isExpired) return session;
+
+    const keepOpen = bot.keepOpen ?? settings?.keepOpen;
+    const status = keepOpen ? 'closed' : 'delete';
+
+    if (keepOpen) {
+      await this.sessionRepository.update({
+        where: { id: session.id },
+        data: { status: 'closed' },
+      });
+    } else {
+      await this.sessionRepository.deleteMany({
+        where: {
+          id: session.id,
+        },
+      });
+    }
+
+    if (this.integrationName === 'Typebot') {
+      const typebotData = {
+        remoteJid,
+        status,
+        session,
+      };
+      this.waMonitor.waInstances[instance.instanceName].sendDataWebhook(Events.TYPEBOT_CHANGE_STATUS, typebotData);
+    }
+
+    return null;
   }
 }

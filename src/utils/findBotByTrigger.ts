@@ -1,19 +1,23 @@
 import { advancedOperatorsSearch } from './advancedOperatorsSearch';
 
 export const findBotByTrigger = async (botRepository: any, content: string, instanceId: string) => {
-  // Check for triggerType 'all' or 'none' (both should match any message)
-  const findTriggerAllOrNone = await botRepository.findFirst({
+  const normalizedContent = typeof content === 'string' ? content.trim() : '';
+
+  if (!normalizedContent) {
+    return null;
+  }
+
+  // 'none' means manual start only. Only 'all' should match arbitrary incoming messages.
+  const findTriggerAll = await botRepository.findFirst({
     where: {
       enabled: true,
-      triggerType: {
-        in: ['all', 'none'],
-      },
+      triggerType: 'all',
       instanceId: instanceId,
     },
   });
 
-  if (findTriggerAllOrNone) {
-    return findTriggerAllOrNone;
+  if (findTriggerAll) {
+    return findTriggerAll;
   }
 
   const findTriggerAdvanced = await botRepository.findMany({
@@ -57,6 +61,8 @@ export const findBotByTrigger = async (botRepository: any, content: string, inst
   let findTriggerRegex = null;
 
   for (const regex of findRegex) {
+    if (!regex.triggerValue?.trim()) continue;
+
     const regexValue = new RegExp(regex.triggerValue);
 
     if (regexValue.test(content)) {
@@ -80,6 +86,8 @@ export const findBotByTrigger = async (botRepository: any, content: string, inst
   let findTriggerStartsWith = null;
 
   for (const startsWith of findStartsWith) {
+    if (!startsWith.triggerValue?.trim()) continue;
+
     if (content.startsWith(startsWith.triggerValue)) {
       findTriggerStartsWith = startsWith;
       break;
@@ -101,6 +109,8 @@ export const findBotByTrigger = async (botRepository: any, content: string, inst
   let findTriggerEndsWith = null;
 
   for (const endsWith of findEndsWith) {
+    if (!endsWith.triggerValue?.trim()) continue;
+
     if (content.endsWith(endsWith.triggerValue)) {
       findTriggerEndsWith = endsWith;
       break;
@@ -122,6 +132,8 @@ export const findBotByTrigger = async (botRepository: any, content: string, inst
   let findTriggerContains = null;
 
   for (const contains of findContains) {
+    if (!contains.triggerValue?.trim()) continue;
+
     if (content.includes(contains.triggerValue)) {
       findTriggerContains = contains;
       break;
